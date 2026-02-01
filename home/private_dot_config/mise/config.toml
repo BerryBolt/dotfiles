@@ -1,2 +1,30 @@
+# mise configuration
+# This is the primary package manager for CLI tools.
+# GUI apps and system dependencies use Homebrew (macOS) or apt/dnf (Linux).
+
 [tools]
-chezmoi = "2.69.3"
+# Core CLI tools
+chezmoi = "latest"
+gh = "latest"
+starship = "latest"
+zoxide = "latest"
+fzf = "latest"
+jq = "latest"
+ripgrep = "latest"
+
+# 1Password CLI
+1password-cli = "latest"
+
+# Language runtimes
+node = "22"
+go = "latest"
+python = "3.13"
+
+# Package managers
+pnpm = "latest"
+uv = "latest"
+
+# Optional: uncomment as needed
+# deno = "latest"
+# bun = "latest"
+# rust = "latest"

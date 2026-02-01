@@ -1,7 +1,7 @@
 # Dotfiles + Bootstrap Plan
 
 **Owner:** Raz + Berry Bolt
-**Status:** Phase 2.7 complete, ready for Phase 3 (bootstrap automation)
+**Status:** Phase 2.8 in progress (mise as package manager)
 **Goal:** One-command bootstrap for Berry (or any AI bot) on a fresh machine, with portable dotfiles and data backup.
 
 ---
@@ -462,6 +462,15 @@ git add -A && git commit -m "Backup $(date +%Y-%m-%d)" && git push
 - [x] **2.7.5** Commit and push
 
 **Phase 2.7 complete!** (2026-02-01)
+
+### Phase 2.8: mise as primary package manager + policy split
+- [x] **2.8.1** Refactor: mise for CLI tools, Homebrew for GUI apps + system deps only
+- [x] **2.8.2** Expand mise config with CLI tools (chezmoi, gh, starship, zoxide, fzf, etc.)
+- [x] **2.8.3** Trim Brewfile to GUI apps only (1password, brave, etc.)
+- [x] **2.8.4** Split policy into multiple docs (README, dependencies, credentials, dotfiles, git)
+- [x] **2.8.5** Update README with new bootstrap flow (macOS + Linux)
+- [x] **2.8.6** Add run_once scripts (install-packages, install-openclaw)
+- [ ] **2.8.7** Commit and push
 
 ### Phase 3: Bootstrap automation
 - [ ] Create `run_once_before` scripts for Homebrew
