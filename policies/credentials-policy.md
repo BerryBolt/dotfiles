@@ -1,4 +1,6 @@
-# Credentials policy
+# Environment management policy
+
+Self-serve operations manual for managing dotfiles, credentials, and environment configuration.
 
 ## Normative language (RFC 2119/8174)
 
@@ -10,143 +12,443 @@
 
 ---
 
-## Purpose
+## Tools
 
-Defines how you store, discover, and use credentials and secrets. 1Password is the **source of truth** for anything you can access.
-
-## Security posture
-
-- MUST NOT paste secrets (API keys/tokens/passwords) into chat, logs, code, or committed files.
-- SHOULD use in-memory workflows (e.g., `op run`, `op inject`) rather than writing secrets to disk.
-- When a new secret is created/obtained, it MUST be stored in 1Password immediately with consistent naming.
+| Tool | Purpose | Docs |
+|------|---------|------|
+| **chezmoi** | Dotfiles management, templating | https://chezmoi.io |
+| **1Password CLI (`op`)** | Secrets management | https://developer.1password.com/docs/cli |
+| **git** | Version control for dotfiles | - |
 
 ---
 
-## Operational assumptions
+## 1Password operations
 
-- You have a dedicated 1Password account.
-- Access is provided via environment variables:
-  - `OP_SERVICE_ACCOUNT_TOKEN` (MUST NOT be printed or logged)
-  - `OP_VAULT`
-- Most secret retrieval SHOULD be possible non-interactively via the 1Password CLI.
-- If you don't have access to 1Password, ask the account owner to grant you access.
+### Environment setup
 
----
+Required environment variables (set before any `op` commands):
+- `OP_SERVICE_ACCOUNT_TOKEN` — service account token (MUST NOT log or print)
+- `OP_VAULT` — default vault name
 
-## Source-of-truth rules
+### Validate access
 
-When asked to enable/configure a tool:
+Before using 1Password, MUST validate:
 
-1. MUST search 1Password first for existing credentials/keys.
-2. If not found, MUST attempt to create the credential programmatically (if possible) using your identity.
-3. MUST store the new credential in 1Password before proceeding with configuration.
-
-Only ask the account owner when:
-
-- The resource requires an account/payment outside your scope, or
-- Access requires human approval (device prompt, billing, etc.).
+```bash
+op whoami
+op vault list
+```
 
 ---
 
-## Programmatic-first access order
+## 1Password invariants (strict)
 
-For any service/tool integration, use this order:
+### Categories (mandatory)
 
-1. API/CLI auth (token/key/OAuth) via scripted flow
-2. SDK / direct HTTP integration (if supported and safer)
-3. Browser automation (fallback only)
+| Use case | Category | CLI flag |
+|----------|----------|----------|
+| Website/service login | `Login` | `--category="Login"` |
+| API key or token | `API Credential` | `--category="API Credential"` |
+| SSH key | `SSH Key` | `--category="SSH Key"` |
+| Credential file (JSON/PEM) | `Document` | `--category="Document"` |
 
----
+MUST use the correct category. MUST NOT use generic categories like `Password` or `Secure Note` for credentials.
 
-## 1Password CLI usage policy
+### Naming conventions (mandatory)
 
-- SHOULD NOT rely on macOS Keychain or other OS-specific secret stores; prefer portable, OS-agnostic workflows.
-- For service-account setup and CLI usage instructions, see the `1password-setup` skill.
+| Type | Pattern | Examples |
+|------|---------|----------|
+| Login | `<Service>` | `GitHub`, `Brave`, `Notion` |
+| API key | `<Service> - API key` | `Brave Search - API key`, `Firecrawl - API key` |
+| Credential file | `<Service> - Credential File` | `Google Cloud - Credential File` |
+| SSH key | `<key filename>` | `id_ed25519` |
 
-### CLI interaction guardrails
+Rules:
+- MUST use regular hyphen (` - `), MUST NOT use em-dash (`—`)
+- MUST NOT include "Login" suffix in login item titles
+- MUST NOT include "API key" in login items (separate item)
+- Service name MUST match official name (e.g., `GitHub` not `Github` or `github`)
 
-- When using interactive sign-in flows, SHOULD run `op` inside a tmux session to avoid TTY/prompt issues.
-- SHOULD validate access before use:
-  - `op whoami`
-  - `op vault list`
+### Item structure (mandatory)
 
----
+| Item type | Required fields | Optional fields |
+|-----------|-----------------|-----------------|
+| Login | username, password | website, 2FA (totp), recovery codes |
+| API Credential | credential | notes (linked login) |
+| SSH Key | private_key | - |
+| Document | file attachment | notes (linked login) |
 
-## Vaults
+### Linking rules
 
-- MUST use `OP_VAULT` as the default target for created items.
-- If a secret must live in a different vault, MUST record that in the item title or tags.
+- API key items MUST include note: `Linked login: <Login title> (item_id: <id>)`
+- Credential files MUST include note: `Linked login: <Login title> (item_id: <id>)`
+- MUST NOT duplicate the secret value in both linked items
 
----
+### No duplicates
 
-## Naming conventions
-
-### API keys
-
-- `<Service> - API key`
-  - Examples:
-    - `Brave Search - API key`
-    - `Firecrawl - API key`
-
-### Logins
-
-- `<Service name>` for your accounts (no "Login" label)
-  - Examples: `GitHub`, `Brave`
-
-### Credential files
-
-- `<Service> - Credential File`
-  - Example: `Google Cloud - Credential File`
+- MUST NOT create multiple items for the same service/credential
+- Before creating: MUST search existing items (see workflow below)
 
 ---
 
-## Item structure + linking
+## 1Password workflows (strict order)
 
-### What goes where
+### Before ANY create operation
 
-- **Login items:** interactive sign-in credentials only (email/username, password, 2FA, recovery codes).
-- **API key items:** non-interactive tokens/keys (one item per key).
-- **Credential file items:** JSON/PEM/etc. stored as 1Password **Document** items.
+```bash
+# 1. MUST search first
+op item list --vault="$OP_VAULT" --format=json | jq -r '.[].title' | grep -i "<service>"
 
-### Default rule (separate items)
+# 2. If found → STOP. Use existing item or update it.
+# 3. If not found → proceed to create
+```
 
-- API keys/tokens MUST be stored in their own 1Password item (one item per key).
-- Login items MUST only contain account credentials (email/username, password, 2FA, recovery codes).
-- Credential files (JSON/PEM/etc.) MUST be stored as 1Password Document items, one file per item.
-- API key items MUST be linked to the originating login item:
-  - In CLI-only flows, add a note or custom field like `Linked login: <Login item title> (<account email>, item_id: <id>)`.
-  - If a UI is ever used, you MAY also add **Related Items** for convenience.
-- Credential file items MUST be linked to the originating login item using the same approach.
-- MUST NOT duplicate the secret value in both items (avoid drift).
+### Create workflow
 
-Rationale: separating keys/files from logins prevents duplication drift, makes rotation and scoping clearer, supports multiple keys/environments, and enables safer sharing/automation without exposing full account credentials.
+```bash
+# 1. Search (see above) - MUST do this first
+# 2. Create with correct category and naming
+op item create --category="<Category>" \
+  --title="<Title per naming convention>" \
+  --vault="$OP_VAULT" \
+  <fields>
 
-### Exceptions (rare)
+# 3. MUST validate immediately after
+op item get "<Title>" --vault="$OP_VAULT" --format=json
 
-- If a service supports exactly one key and the key is only for occasional manual use, the API key MAY be stored as a custom field on the login item.
-- If the key is used by automation or multiple keys exist, you SHOULD still create a dedicated API key item even if a custom field exists.
+# 4. MUST verify: title, category, and fields match expected values
+```
 
-### Notes / metadata
+### Web login workflow (strict order)
 
-- Keep a short “How to rotate” note in the item.
-- Include the intended purpose/use-case in the item notes (instead of the title).
-- Include relevant URLs and account identifiers (email), not the secret in notes if it’s already in a password field.
-- If a credential file must be written to disk, SHOULD write to a temporary path with tight permissions and delete it after use.
+When signing up for a new web service:
 
-### Referencing items
+```
+1. Search 1P for existing login → if exists, use it
+2. Create Login item in 1P FIRST (with planned username/email)
+3. Validate item exists in 1P
+4. THEN proceed with web signup
+5. Update 1P item with actual password after signup
+6. Update with 2FA/recovery codes if enabled
+7. Validate final item state
+```
 
-- Documentation and runbooks SHOULD reference credentials by 1Password **item_id** (or a stable link that includes it), not by name or other means. If it changes, you MUST update all references.
+MUST NOT proceed to web signup before creating 1P item. This prevents lost credentials.
+
+### Update workflow
+
+```bash
+# 1. Get current item state
+op item get "<Title>" --vault="$OP_VAULT" --format=json
+
+# 2. Update specific field
+op item edit "<Title>" "<field>=<value>" --vault="$OP_VAULT"
+
+# 3. MUST validate after update
+op item get "<Title>" --vault="$OP_VAULT" --format=json
+```
 
 ---
 
-## Rotation + recovery
+## 1Password compliance
 
-- If a token is suspected leaked, MUST rotate immediately and update the 1Password item.
-- SHOULD create tokens with least privilege and scoped to your use.
+### What makes an item compliant
+
+An item is compliant if ALL of these are true:
+- [ ] Correct category (see Categories table)
+- [ ] Correct naming convention (see Naming table)
+- [ ] No duplicate items for same service
+- [ ] API keys/files linked to login item (if applicable)
+- [ ] No secrets duplicated across items
+
+### Self-heal: detect non-compliant items
+
+```bash
+# List all items for review
+op item list --vault="$OP_VAULT" --format=json | jq -r '.[] | "\(.category): \(.title)"'
+```
+
+Check for:
+- Wrong category (e.g., `Password` instead of `API Credential`)
+- Wrong naming (e.g., `GitHub Login` instead of `GitHub`)
+- Missing links (API key without `Linked login:` note)
+- Duplicates (multiple items for same service)
+
+### Self-heal: fix non-compliant items
+
+**Wrong category:** Cannot change category. MUST create new item with correct category, migrate data, delete old item.
+
+**Wrong naming:**
+```bash
+op item edit "<old title>" title="<new title>" --vault="$OP_VAULT"
+```
+
+**Missing link:**
+```bash
+# Get login item ID first
+op item get "<Login title>" --vault="$OP_VAULT" --format=json | jq -r '.id'
+
+# Add link to API key item
+op item edit "<API key title>" notesPlain="Linked login: <Login title> (item_id: <id>)" --vault="$OP_VAULT"
+```
+
+**Duplicates:** Merge data into one item, delete the other. Prefer keeping the older/more complete item.
+
+---
+
+## 1Password CLI reference
+
+### Read
+
+```bash
+op read "op://<vault>/<item>/<field>"
+op read "op://$OP_VAULT/GitHub/password"
+```
+
+### Create
+
+```bash
+# Login
+op item create --category="Login" --title="<Service>" --vault="$OP_VAULT" \
+  username="<email>" password="<password>"
+
+# API key
+op item create --category="API Credential" --title="<Service> - API key" --vault="$OP_VAULT" \
+  credential="<token>"
+
+# SSH key
+op item create --category="SSH Key" --title="id_ed25519" --vault="$OP_VAULT" \
+  --ssh-key="$HOME/.ssh/id_ed25519"
+```
+
+### Update
+
+```bash
+op item edit "<title>" "<field>=<value>" --vault="$OP_VAULT"
+```
+
+### Validate
+
+```bash
+op item get "<title>" --vault="$OP_VAULT" --format=json
+```
+
+### List
+
+```bash
+op item list --vault="$OP_VAULT" --format=json
+```
+
+---
+
+## chezmoi operations
+
+### Source directory
+
+```
+~/.local/share/chezmoi/          # chezmoi source (this repo)
+├── .chezmoiroot                 # points to home/
+├── home/                        # actual dotfiles
+│   ├── .chezmoi.toml.tmpl       # init prompts
+│   ├── .chezmoiscripts/         # run_once scripts
+│   ├── dot_zshrc
+│   └── private_dot_*/           # private files
+├── policies/                    # reference docs
+└── skills/                      # AI-executable procedures
+```
+
+### Common commands
+
+```bash
+# View pending changes
+chezmoi diff
+
+# Apply changes
+chezmoi apply
+
+# Add a file (makes it managed)
+chezmoi add ~/.some-config
+
+# Add as template
+chezmoi add --template ~/.some-config
+
+# Edit a managed file
+chezmoi edit ~/.some-config
+
+# View what chezmoi would generate
+chezmoi cat ~/.some-config
+
+# Re-init (re-run prompts)
+chezmoi init
+```
+
+### Template variables
+
+Available in `.tmpl` files:
+
+| Variable | Description |
+|----------|-------------|
+| `{{ .agent_name }}` | Agent display name |
+| `{{ .agent_email }}` | Agent email |
+| `{{ .agent_handle_github }}` | GitHub username |
+| `{{ .op_vault }}` | 1Password vault name |
+| `{{ .op_service_account_token }}` | 1Password service account token |
+| `{{ .chezmoi.homeDir }}` | Home directory path |
+| `{{ .chezmoi.os }}` | Operating system |
+
+### 1Password in templates
+
+```
+{{ onepasswordRead "op://<vault>/<item>/<field>" }}
+{{ onepasswordRead "op://Berry Bolt/Telegram Bot - API key/credential" | quote }}
+```
+
+### Adding a new dotfile
+
+1. Create or edit the file in your home directory
+2. Add to chezmoi: `chezmoi add ~/.newfile`
+3. If it needs templating: `chezmoi add --template ~/.newfile`
+4. Edit template if needed: `chezmoi edit ~/.newfile`
+5. Verify: `chezmoi diff`
+6. Commit: see git practices below
+
+### run_once scripts
+
+Location: `home/.chezmoiscripts/<os>/`
+
+Naming: `run_once_before_<order>-<name>.sh.tmpl`
+
+Example: `run_once_before_01-restore-ssh-key.sh.tmpl`
+
+Scripts run once per machine (tracked by checksum).
+
+---
+
+## Git practices (dotfiles repo)
+
+### Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+```
+
+Common types: `feat`, `fix`, `docs`, `refactor`, `chore`
+
+Examples:
+```
+feat: add mise config for node/python versions
+fix: chezmoi template syntax for openclaw.json
+refactor: reorganize repo with home/ as chezmoi root
+docs: update credentials policy with strict invariants
+chore: add starship and zoxide to Brewfile
+```
+
+### Atomic commits
+
+- Each commit SHOULD contain one logical change
+- Group related changes together (e.g., new dotfile + its template variables)
+- MUST NOT mix unrelated changes in one commit
+- If a change spans multiple files for one purpose, that's one commit
+
+### Sync with upstream
+
+- MUST pull before starting work: `git -C ~/.local/share/chezmoi pull`
+- MUST push after each commit (or batch of related commits)
+- SHOULD NOT leave uncommitted changes overnight
+
+### Prohibited operations
+
+- MUST NOT rebase
+- MUST NOT force push (`--force`, `-f`)
+- MUST NOT reset (`git reset --hard`)
+- MUST NOT amend pushed commits
+
+### What to commit
+
+MUST commit:
+- All dotfiles in `home/`
+- Templates (`.tmpl` files)
+- Policies and skills
+- Brewfile
+- run_once scripts
+
+MUST NOT commit:
+- Secrets or tokens (use 1Password + templates)
+- `~/.config/chezmoi/chezmoi.toml` (machine-specific, has token)
+- Large binary files
+- OS-generated files (`.DS_Store`)
+
+### Commit workflow
+
+```bash
+# Check status
+git -C ~/.local/share/chezmoi status
+
+# Stage specific files
+git -C ~/.local/share/chezmoi add home/dot_zshrc
+
+# Commit
+git -C ~/.local/share/chezmoi commit -m "update: add zoxide aliases"
+
+# Push
+git -C ~/.local/share/chezmoi push
+```
+
+### After modifying a managed file
+
+If you edit a file that chezmoi manages (e.g., `~/.zshrc`):
+
+1. Check diff: `chezmoi diff`
+2. If changes should persist, update source: `chezmoi add ~/.zshrc`
+3. Commit the change
+4. Push
+
+---
+
+## Account/credential creation workflow
+
+When a new service credential is needed:
+
+1. **Check 1Password first**
+   ```bash
+   op item list --vault="$OP_VAULT" | grep -i "<service>"
+   ```
+
+2. **If not found, create programmatically** (if service supports it)
+   - Use API/CLI to generate token
+   - Immediately store in 1Password (see naming conventions)
+
+3. **Update chezmoi template** (if needed)
+   - Add 1Password reference to template
+   - Test: `chezmoi cat <file>`
+   - Apply: `chezmoi apply`
+   - Commit
+
+4. **Rotate if compromised**
+   - Revoke old credential at service
+   - Generate new credential
+   - Update 1Password item
+   - `chezmoi apply` (templates auto-update)
+
+---
+
+## Skills
+
+Procedural knowledge for complex operations. See `skills/` directory.
+
+Available skills:
+- `1password-setup` — Service account setup, CLI configuration (TODO)
+
+Skills follow the [Agent Skills](https://agentskills.io) format.
 
 ---
 
 ## Change log
 
-- 2026-02-01: made runtime-agnostic; fixed em-dashes in naming conventions; removed open questions section.
-- 2026-01-27: initial draft created (1Password is source of truth; programmatic-first).
+- 2026-02-01: added strict invariants (categories, naming, workflows); added compliance checks and self-heal procedures.
+- 2026-02-01: rewritten as self-serve ops manual; removed escalation guardrails.
+- 2026-01-27: initial draft.

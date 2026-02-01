@@ -1,7 +1,7 @@
 # Dotfiles + Bootstrap Plan
 
 **Owner:** Raz + Berry Bolt
-**Status:** Phase 2 in progress (2.5 done, 2.6 repo reorg next)
+**Status:** Phase 2.6 complete, Phase 2.7 (policy rewrite) in progress
 **Goal:** One-command bootstrap for Berry (or any AI bot) on a fresh machine, with portable dotfiles and data backup.
 
 ---
@@ -444,13 +444,22 @@ git add -A && git commit -m "Backup $(date +%Y-%m-%d)" && git push
 - [ ] **2.5.3** Document any manual steps needed (defer to Phase 3)
 
 ### Phase 2.6: Repo reorganization
-- [ ] **2.6.1** Create `home/` directory structure
-- [ ] **2.6.2** Add `.chezmoiroot` with `home`
-- [ ] **2.6.3** Move dotfiles into `home/`
-- [ ] **2.6.4** Create `home/.chezmoiscripts/darwin/` and move run_once scripts
-- [ ] **2.6.5** Add README.md at repo root
-- [ ] **2.6.6** Move credentials-policy.md from workspace to `policies/`
-- [ ] **2.6.7** Commit and push
+- [x] **2.6.1** Create `home/` directory structure
+- [x] **2.6.2** Add `.chezmoiroot` with `home`
+- [x] **2.6.3** Move dotfiles into `home/`
+- [x] **2.6.4** Create `home/.chezmoiscripts/darwin/` and move run_once scripts
+- [ ] **2.6.5** Add README.md at repo root (deferred)
+- [x] **2.6.6** Move credentials-policy.md from workspace to `policies/`
+- [x] **2.6.7** Commit and push
+
+**Phase 2.6 complete!** (2026-02-01)
+
+### Phase 2.7: Policy rewrite (ops manual)
+- [ ] **2.7.1** Rewrite credentials-policy.md as self-serve ops manual
+- [ ] **2.7.2** Focus: chezmoi operations, 1P operations, git practices, naming conventions
+- [ ] **2.7.3** Remove guardrails/escalation language (agent is autonomous)
+- [ ] **2.7.4** Add placeholder for `1password-setup` skill
+- [ ] **2.7.5** Commit and push
 
 ### Phase 3: Bootstrap automation
 - [ ] Create `run_once_before` scripts for Homebrew
