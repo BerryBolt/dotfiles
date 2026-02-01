@@ -1,0 +1,29 @@
+#!/bin/bash
+# Restore SSH key from 1Password
+
+set -e
+
+SSH_DIR="$HOME/.ssh"
+SSH_KEY="$SSH_DIR/id_ed25519"
+
+# Skip if key already exists
+if [[ -f "$SSH_KEY" ]]; then
+    echo "SSH key already exists, skipping..."
+    exit 0
+fi
+
+echo "Restoring SSH key from 1Password..."
+
+# Create .ssh directory if needed
+mkdir -p "$SSH_DIR"
+chmod 700 "$SSH_DIR"
+
+# Fetch private key from 1Password
+op item get "id_ed25519" --vault "{{ .op_vault }}" --fields "private_key" --reveal > "$SSH_KEY"
+chmod 600 "$SSH_KEY"
+
+# Generate public key from private
+ssh-keygen -y -f "$SSH_KEY" > "$SSH_KEY.pub"
+chmod 644 "$SSH_KEY.pub"
+
+echo "SSH key restored successfully."
