@@ -2,7 +2,7 @@
 {{- $agent_email := promptStringOnce . "agent_email" "Agent email" -}}
 {{- $agent_handle_github := promptStringOnce . "agent_handle_github" "GitHub handle (e.g., BerryBolt)" -}}
 {{- $op_vault := promptStringOnce . "op_vault" "1Password vault name" -}}
-{{- $op_service_account_token := promptStringOnce . "op_service_account_token" "1Password Service Account Token" -}}
+{{- $op_service_account_token := or (env "OP_SERVICE_ACCOUNT_TOKEN") (promptStringOnce . "op_service_account_token" "1Password Service Account Token") -}}
 {{- $ai_cli := promptChoiceOnce . "ai_cli" "AI CLI to install" (list "claude-code" "codex" "none") -}}
 
 [data]
