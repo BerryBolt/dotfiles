@@ -5,11 +5,10 @@ Chezmoi-managed dotfiles for AI agent environments. One-command bootstrap on fre
 ## Quick start
 
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN="<your-token>"
 curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
 ```
 
-You need a **1Password service account token** first — see [1password-setup skill](skills/1password-setup/SKILL.md).
+You'll be prompted for your **1Password service account token** — see [1password-setup skill](skills/1password-setup/SKILL.md) to create one.
 
 During setup you'll configure: agent name, email, GitHub handle, vault name, and AI CLI choice (claude-code / codex / none).
 

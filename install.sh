@@ -6,14 +6,21 @@ set -e
 
 echo "=== Dotfiles Bootstrap ==="
 
-# Check for required env var
+# Prompt for token if not set (avoids exposing in shell history)
 if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-    echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set"
-    echo ""
-    echo "Set it first:"
-    echo "  export OP_SERVICE_ACCOUNT_TOKEN=\"<your-token>\""
-    echo ""
+    echo "1Password service account token required."
     echo "See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
+    echo ""
+    printf "Enter token: "
+    stty -echo
+    read OP_SERVICE_ACCOUNT_TOKEN
+    stty echo
+    echo ""
+    export OP_SERVICE_ACCOUNT_TOKEN
+fi
+
+if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    echo "Error: No token provided"
     exit 1
 fi
 
