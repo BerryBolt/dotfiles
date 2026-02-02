@@ -35,7 +35,7 @@ if ! command -v mise > /dev/null 2>&1; then
 fi
 
 # Activate mise
-eval "$(~/.local/bin/mise activate sh)"
+eval "$(~/.local/bin/mise activate bash)"
 
 # Install chezmoi via mise
 echo "Installing chezmoi..."
