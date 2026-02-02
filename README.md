@@ -2,6 +2,15 @@
 
 Chezmoi-managed dotfiles for AI agent environments. Designed for one-command bootstrap on fresh machines.
 
+## Prerequisites
+
+Before bootstrapping, you need:
+
+1. **1Password account** with a vault for this agent
+2. **1Password service account token** — see [skills/1password-setup](skills/1password-setup/SKILL.md) for setup instructions
+
+The service account must have access to the agent's vault.
+
 ## Quick start
 
 ### macOS
@@ -57,6 +66,23 @@ You'll be prompted for:
 - GitHub handle (e.g., `BerryBolt`)
 - 1Password vault name
 - 1Password service account token
+- AI CLI choice (claude-code / codex / none)
+
+### AI-assisted setup
+
+After bootstrap, use the installed AI CLI to run skills:
+
+```bash
+# Start AI CLI
+claude  # or codex
+
+# AI can read skills/ directory and help with:
+# - 1Password troubleshooting
+# - Adding new credentials
+# - Managing dotfiles
+```
+
+Skills are in `skills/` — AI-readable procedures for common tasks.
 
 ## What gets installed
 
@@ -64,15 +90,13 @@ You'll be prompted for:
 - `~/.zprofile` — Homebrew setup (macOS)
 - `~/.zshrc` — Shell config (mise, starship, zoxide, fzf)
 - `~/.gitconfig` — Git config with signing
-- `~/.config/mise/config.toml` — CLI tools and runtimes
-- `~/.openclaw/openclaw.json` — OpenClaw config
-- `~/.openclaw/.env` — OpenClaw secrets
+- `~/.config/mise/config.toml` — CLI tools
+- `~/.openclaw/*` — OpenClaw config (if using OpenClaw)
 
 ### CLI tools (via mise)
 - chezmoi, gh, starship, zoxide, fzf, jq, ripgrep
 - 1password-cli
-- node, python, go
-- pnpm, uv
+- Language runtimes (node, python, go, etc.) available but commented out - uncomment as needed
 
 ### GUI apps + system deps (via Homebrew, macOS only)
 - 1password, brave-browser, claude, tailscale
@@ -130,7 +154,8 @@ git -C ~/.local/share/chezmoi remote set-url origin git@github.com:BerryBolt/dot
 │   ├── dependencies.md       # mise, Homebrew
 │   ├── dotfiles.md           # chezmoi
 │   └── git.md                # Version control
-└── skills/                   # AI-executable procedures (TODO)
+└── skills/                   # AI-executable procedures
+    └── 1password-setup/      # Service account setup
 ```
 
 ## Template variables

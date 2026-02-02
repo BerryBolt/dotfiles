@@ -13,7 +13,7 @@ chezmoi operations for managing dotfiles.
 │   ├── dot_zshrc
 │   └── private_dot_*/           # private files
 ├── policies/                    # reference docs
-└── skills/                      # AI-executable procedures
+└── skills/                      # AI-executable procedures (agentskills.io format)
 ```
 
 ## Common commands

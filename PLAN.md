@@ -474,6 +474,14 @@ git add -A && git commit -m "Backup $(date +%Y-%m-%d)" && git push
 
 **Phase 2.8 complete!** (2026-02-01)
 
+### Phase 2.9: AI CLI integration
+- [x] **2.9.1** Add prompt for AI CLI choice (claude-code / codex / none)
+- [x] **2.9.2** Add run_once script to install chosen AI CLI
+- [x] **2.9.3** Create `1password-setup` skill
+- [x] **2.9.4** Update README with prerequisites and AI-assisted bootstrap flow
+- [x] **2.9.5** Trim mise config to essentials (language runtimes opt-in)
+- [ ] **2.9.6** Commit and push
+
 ### Phase 3: Bootstrap automation
 - [ ] Create `run_once_before` scripts for Homebrew
 - [ ] Create `run_once_after` scripts for OpenClaw install (`curl | bash`)

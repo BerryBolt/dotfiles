@@ -1,0 +1,31 @@
+#!/bin/bash
+# Install AI CLI based on user choice
+
+set -e
+
+# Ensure mise shims are in PATH
+eval "$(mise activate bash)"
+
+AI_CLI="{{ .ai_cli }}"
+
+case "$AI_CLI" in
+  "claude-code")
+    echo "Installing Claude Code..."
+    # Native installer (recommended, npm is deprecated)
+    curl -fsSL https://claude.ai/install.sh | sh
+    echo "Claude Code installed. Run 'claude' to start."
+    ;;
+  "codex")
+    echo "Installing OpenAI Codex CLI..."
+    # Codex requires npm, install node first
+    mise use node@latest
+    npm install -g @openai/codex
+    echo "Codex CLI installed. Run 'codex' to start."
+    ;;
+  "none")
+    echo "Skipping AI CLI installation."
+    ;;
+  *)
+    echo "Unknown AI CLI choice: $AI_CLI"
+    ;;
+esac

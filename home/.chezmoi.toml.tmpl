@@ -3,11 +3,13 @@
 {{- $agent_handle_github := promptStringOnce . "agent_handle_github" "GitHub handle (e.g., BerryBolt)" -}}
 {{- $op_vault := promptStringOnce . "op_vault" "1Password vault name" -}}
 {{- $op_service_account_token := promptStringOnce . "op_service_account_token" "1Password Service Account Token" -}}
+{{- $ai_cli := promptChoiceOnce . "ai_cli" "AI CLI to install" (list "claude-code" "codex" "none") -}}
 
-[data]                                                                                                                                                                                                          
+[data]
   agent_name = {{ $agent_name | quote }}
   agent_email = {{ $agent_email | quote }}
   agent_handle_github = {{ $agent_handle_github | quote }}
   op_service_account_token = {{ $op_service_account_token | quote }}
   op_vault = {{ $op_vault | quote }}
+  ai_cli = {{ $ai_cli | quote }}
   

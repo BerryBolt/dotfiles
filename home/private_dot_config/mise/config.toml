@@ -15,16 +15,12 @@ ripgrep = "latest"
 # 1Password CLI
 1password-cli = "latest"
 
-# Language runtimes
-node = "22"
-go = "latest"
-python = "3.13"
-
-# Package managers
-pnpm = "latest"
-uv = "latest"
-
 # Optional: uncomment as needed
+# node = "latest"
+# go = "latest"
+# python = "latest"
+# rust = "latest"
 # deno = "latest"
 # bun = "latest"
-# rust = "latest"
+# pnpm = "latest"
+# uv = "latest"
