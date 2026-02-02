@@ -1,7 +1,7 @@
 # Dotfiles + Bootstrap Plan
 
 **Owner:** Raz + Berry Bolt
-**Status:** Phase 2.8 complete, ready for Phase 3 (bootstrap testing)
+**Status:** Phase 2.9 complete, ready for Phase 3 (bootstrap testing on fresh VM)
 **Goal:** One-command bootstrap for Berry (or any AI bot) on a fresh machine, with portable dotfiles and data backup.
 
 ---
@@ -480,7 +480,9 @@ git add -A && git commit -m "Backup $(date +%Y-%m-%d)" && git push
 - [x] **2.9.3** Create `1password-setup` skill
 - [x] **2.9.4** Update README with prerequisites and AI-assisted bootstrap flow
 - [x] **2.9.5** Trim mise config to essentials (language runtimes opt-in)
-- [ ] **2.9.6** Commit and push
+- [x] **2.9.6** Commit and push
+
+**Phase 2.9 complete!** (2026-02-02)
 
 ### Phase 3: Bootstrap automation
 - [ ] Create `run_once_before` scripts for Homebrew
