@@ -86,9 +86,13 @@ You'll be prompted for:
 
 ### Install OpenClaw (optional)
 
+These dotfiles work with any AI CLI (Claude Code, Codex, Gemini CLI, etc.). OpenClaw is optional.
+
 ```bash
 curl -fsSL https://openclaw.ai/install.sh | bash
 ```
+
+If installed, OpenClaw can use the same skills and policies from this repo.
 
 ### Clone workspace/brain repo (optional)
 
