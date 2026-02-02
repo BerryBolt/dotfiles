@@ -12,9 +12,9 @@ if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
     echo "See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
     echo ""
     printf "Enter token: "
-    stty -echo
-    read OP_SERVICE_ACCOUNT_TOKEN
-    stty echo
+    stty -echo < /dev/tty
+    read OP_SERVICE_ACCOUNT_TOKEN < /dev/tty
+    stty echo < /dev/tty
     echo ""
     export OP_SERVICE_ACCOUNT_TOKEN
 fi
