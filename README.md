@@ -16,24 +16,21 @@ The service account must have access to the agent's vault.
 ### macOS
 
 ```bash
-# 1. Install Homebrew
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-eval "$(/opt/homebrew/bin/brew shellenv)"
+# 1. Install mise
+curl https://mise.run | sh
+echo 'eval "$(~/.local/bin/mise activate zsh)"' >> ~/.zshrc
+eval "$(~/.local/bin/mise activate zsh)"
 
-# 2. Install mise (entry point)
-brew install mise
-eval "$(mise activate zsh)"
-
-# 3. Install chezmoi via mise
+# 2. Install chezmoi via mise
 mise use chezmoi@latest
 
-# 4. Set 1Password token
+# 3. Set 1Password token
 export OP_SERVICE_ACCOUNT_TOKEN="<your-token>"
 
-# 5. Bootstrap (uses HTTPS to avoid SSH chicken-and-egg)
+# 4. Bootstrap (uses HTTPS to avoid SSH chicken-and-egg)
 chezmoi init --apply https://github.com/BerryBolt/dotfiles.git
 
-# 6. Restart shell
+# 5. Restart shell
 exec zsh
 ```
 
