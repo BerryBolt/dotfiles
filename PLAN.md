@@ -1,7 +1,7 @@
 # Dotfiles + Bootstrap Plan
 
 **Owner:** Raz + Berry Bolt
-**Status:** Phase 2.8 in progress (mise as package manager)
+**Status:** Phase 2.8 complete, ready for Phase 3 (bootstrap testing)
 **Goal:** One-command bootstrap for Berry (or any AI bot) on a fresh machine, with portable dotfiles and data backup.
 
 ---
@@ -470,7 +470,9 @@ git add -A && git commit -m "Backup $(date +%Y-%m-%d)" && git push
 - [x] **2.8.4** Split policy into multiple docs (README, dependencies, credentials, dotfiles, git)
 - [x] **2.8.5** Update README with new bootstrap flow (macOS + Linux)
 - [x] **2.8.6** Add run_once scripts (install-packages, install-openclaw)
-- [ ] **2.8.7** Commit and push
+- [x] **2.8.7** Commit and push
+
+**Phase 2.8 complete!** (2026-02-01)
 
 ### Phase 3: Bootstrap automation
 - [ ] Create `run_once_before` scripts for Homebrew
