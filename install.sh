@@ -1,24 +1,23 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # One-line bootstrap for Berry Bolt dotfiles
-# Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | bash
 
 set -e
 
 echo "=== Dotfiles Bootstrap ==="
 
-# Prompt for token if not set (avoids exposing in shell history)
+# Prompt for token if not set (read -s requires bash, hides input)
 if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    if [ ! -t 0 ] && [ ! -e /dev/tty ]; then
+        echo "Error: No terminal available and OP_SERVICE_ACCOUNT_TOKEN not set"
+        echo "Set the env var first, then re-run."
+        exit 1
+    fi
     echo "1Password service account token required."
     echo "See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
     echo ""
     printf "Enter token: "
-    # Read from /dev/tty with hidden input (works when piped to sh)
-    OP_SERVICE_ACCOUNT_TOKEN=$(
-        stty -echo
-        read token
-        stty echo
-        echo "$token"
-    ) < /dev/tty
+    read -rs OP_SERVICE_ACCOUNT_TOKEN < /dev/tty
     echo ""
     export OP_SERVICE_ACCOUNT_TOKEN
 fi
