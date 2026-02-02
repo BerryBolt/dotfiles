@@ -46,7 +46,7 @@ mise use -g chezmoi@latest
 
 # Bootstrap dotfiles
 echo "Bootstrapping dotfiles..."
-if ! chezmoi init --apply BerryBolt/dotfiles; then
+if ! mise exec chezmoi -- init --apply BerryBolt/dotfiles; then
     echo ""
     echo "=== Bootstrap failed or aborted ==="
     exit 1
