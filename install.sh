@@ -4,6 +4,9 @@
 
 set -e
 
+# Exit cleanly on Ctrl+C
+trap 'echo ""; echo "Aborted."; exit 1' INT TERM
+
 echo "=== Dotfiles Bootstrap ==="
 
 # Prompt for token if not set (read -s requires bash, hides input)
