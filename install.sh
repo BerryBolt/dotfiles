@@ -110,15 +110,15 @@ if [ -z "${CHEZMOI_AI_CLI:-}" ]; then
   log_info "Select AI CLI to install"
   echo ""
   if command -v gum >/dev/null 2>&1; then
-    CHEZMOI_AI_CLI=$(gum choose "claude-code" "codex" "none") || abort
+    CHEZMOI_AI_CLI=$(gum choose "claude" "codex" "none") || abort
   elif [ -e /dev/tty ]; then
-    echo "    1) claude-code"
+    echo "    1) claude"
     echo "    2) codex"
     echo "    3) none"
     printf "    Enter choice [1-3]: "
     read -r choice < /dev/tty
     case "$choice" in
-      1) CHEZMOI_AI_CLI="claude-code" ;;
+      1) CHEZMOI_AI_CLI="claude" ;;
       2) CHEZMOI_AI_CLI="codex" ;;
       *) CHEZMOI_AI_CLI="none" ;;
     esac

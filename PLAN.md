@@ -475,7 +475,7 @@ git add -A && git commit -m "Backup $(date +%Y-%m-%d)" && git push
 **Phase 2.8 complete!** (2026-02-01)
 
 ### Phase 2.9: AI CLI integration
-- [x] **2.9.1** Add prompt for AI CLI choice (claude-code / codex / none)
+- [x] **2.9.1** Add prompt for AI CLI choice (claude / codex / none)
 - [x] **2.9.2** Add run_once script to install chosen AI CLI
 - [x] **2.9.3** Create `1password-setup` skill
 - [x] **2.9.4** Update README with prerequisites and AI-assisted bootstrap flow

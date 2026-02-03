@@ -9,11 +9,11 @@ eval "$(mise activate bash)"
 AI_CLI="{{ .ai_cli }}"
 
 case "$AI_CLI" in
-  "claude-code")
-    echo "Installing Claude Code..."
+  "claude"|"claude-code")
+    echo "Installing Claude CLI..."
     # Native installer (recommended, npm is deprecated)
     curl -fsSL https://claude.ai/install.sh | sh
-    echo "Claude Code installed. Run 'claude' to start."
+    echo "Claude CLI installed. Run 'claude' to start."
     ;;
   "codex")
     echo "Installing OpenAI Codex CLI..."

@@ -5,10 +5,12 @@
 {{- $op_service_account_token := or (env "OP_SERVICE_ACCOUNT_TOKEN") (promptStringOnce . "op_service_account_token" "1Password Service Account Token") -}}
 {{- $ai_cli_env := (env "CHEZMOI_AI_CLI") | lower -}}
 {{- $ai_cli := "" -}}
-{{- if or (eq $ai_cli_env "claude-code") (eq $ai_cli_env "codex") (eq $ai_cli_env "none") -}}
+{{- if or (eq $ai_cli_env "claude") (eq $ai_cli_env "claude-code") -}}
+{{- $ai_cli = "claude" -}}
+{{- else if or (eq $ai_cli_env "codex") (eq $ai_cli_env "none") -}}
 {{- $ai_cli = $ai_cli_env -}}
 {{- else -}}
-{{- $ai_cli = promptChoiceOnce . "ai_cli" "AI CLI to install" (list "claude-code" "codex" "none") -}}
+{{- $ai_cli = promptChoiceOnce . "ai_cli" "AI CLI to install" (list "claude" "codex" "none") -}}
 {{- end -}}
 
 [data]

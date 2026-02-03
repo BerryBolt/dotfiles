@@ -10,7 +10,7 @@ curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh 
 
 You need a **1Password service account token** — see [1password-setup skill](skills/1password-setup/SKILL.md) to create one.
 
-During setup you'll configure: agent name, email, GitHub handle, vault name, and AI CLI choice (claude-code / codex / none).
+During setup you'll configure: agent name, email, GitHub handle, vault name, and AI CLI choice (claude / codex / none).
 
 After bootstrap, restart your shell (`exec $SHELL`) and use your AI CLI to run skills from `skills/`.
 
