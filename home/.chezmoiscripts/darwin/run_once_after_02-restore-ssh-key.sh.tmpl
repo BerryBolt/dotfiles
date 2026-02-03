@@ -3,6 +3,9 @@
 
 set -e
 
+# Ensure mise shims are in PATH (for op command)
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
 SSH_DIR="$HOME/.ssh"
 SSH_KEY="$SSH_DIR/id_ed25519"
 
