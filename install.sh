@@ -88,6 +88,13 @@ ensure_mise_tool() {
   fi
 }
 
+is_blank() {
+  case "${1-}" in
+    *[!$' \t\r\n']*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 prompt_string() {
   local label="$1"
   local varname="$2"
@@ -229,7 +236,7 @@ review_and_edit() {
     echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
     echo "    1Password vault: $OP_VAULT"
     echo "    AI CLI: $CHEZMOI_AI_CLI"
-    if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    if ! is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       local tail="${OP_SERVICE_ACCOUNT_TOKEN: -4}"
       if [ "${#OP_SERVICE_ACCOUNT_TOKEN}" -le 4 ]; then
         echo "    Token: set (${tail})"
@@ -274,7 +281,7 @@ review_and_edit() {
 
     case "$choice" in
       "Confirm")
-        if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+        if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
           log_info "1Password token required before continuing"
           prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
           continue
@@ -323,6 +330,9 @@ AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
 AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
 OP_VAULT="${CHEZMOI_OP_VAULT:-}"
 OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
+if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
+  OP_SERVICE_ACCOUNT_TOKEN=""
+fi
 
 ai_cli_env="${CHEZMOI_AI_CLI:-}"
 if [ -n "$ai_cli_env" ]; then
@@ -340,7 +350,9 @@ if ! is_tty; then
   [ -z "$AGENT_EMAIL" ] && missing+=("CHEZMOI_AGENT_EMAIL")
   [ -z "$AGENT_HANDLE_GITHUB" ] && missing+=("CHEZMOI_AGENT_HANDLE_GITHUB")
   [ -z "$OP_VAULT" ] && missing+=("CHEZMOI_OP_VAULT")
-  [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ] && missing+=("OP_SERVICE_ACCOUNT_TOKEN")
+  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
+    missing+=("OP_SERVICE_ACCOUNT_TOKEN")
+  fi
 
   if [ "${#missing[@]}" -gt 0 ]; then
     log_error "No terminal available. Set env vars: ${missing[*]}"
@@ -362,7 +374,7 @@ else
   if [ -z "$OP_VAULT" ]; then
     prompt_string "1Password vault name" OP_VAULT "Berry Bolt"
   fi
-  if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
     echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
     echo ""
     prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
