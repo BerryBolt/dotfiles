@@ -1,78 +1,114 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # One-line bootstrap for Berry Bolt dotfiles
 # Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | bash
 
-set -e
-trap 'echo ""; echo "Aborted."; exit 1' INT TERM
-
-echo "=== Dotfiles Bootstrap ==="
+set -eu
+trap 'log_error "Aborted."' INT TERM
 
 #
-# 1. Get 1Password token (prompt if not set)
+# Logging (with gum support and fallback)
 #
-if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-    if [ ! -e /dev/tty ]; then
-        echo "Error: No terminal available and OP_SERVICE_ACCOUNT_TOKEN not set"
-        exit 1
-    fi
-    echo "1Password service account token required."
-    echo "See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
-    echo ""
-    printf "Enter token: "
-    read -rs OP_SERVICE_ACCOUNT_TOKEN < /dev/tty
-    echo ""
+log_info() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 75 "→ $*"
+  else
+    printf "\033[0;34m→ %s\033[0m\n" "$*"
+  fi
+}
+
+log_success() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 82 "✓ $*"
+  else
+    printf "\033[0;32m✓ %s\033[0m\n" "$*"
+  fi
+}
+
+log_error() {
+  if command -v gum >/dev/null 2>&1; then
+    gum style --foreground 196 "✗ $*"
+  else
+    printf "\033[0;31m✗ %s\033[0m\n" "$*" >&2
+  fi
+  exit 1
+}
+
+#
+# 1. Install gum for enhanced prompts
+#
+if ! command -v gum >/dev/null 2>&1; then
+  if command -v brew >/dev/null 2>&1; then
+    echo "Installing gum..."
+    brew install gum >/dev/null 2>&1
+  fi
 fi
 
-if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-    echo "Error: No token provided"
-    exit 1
+echo ""
+log_info "Dotfiles Bootstrap"
+echo ""
+
+#
+# 2. Get 1Password token
+#
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  log_info "1Password service account token required"
+  echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
+  echo ""
+
+  if command -v gum >/dev/null 2>&1; then
+    OP_SERVICE_ACCOUNT_TOKEN=$(gum input --password --placeholder "Enter token...")
+  elif [ -e /dev/tty ]; then
+    printf "    Enter token: "
+    read -rs OP_SERVICE_ACCOUNT_TOKEN < /dev/tty
+    echo ""
+  else
+    log_error "No terminal available. Set OP_SERVICE_ACCOUNT_TOKEN env var."
+  fi
+fi
+
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  log_error "No token provided"
 fi
 export OP_SERVICE_ACCOUNT_TOKEN
 
 #
-# 2. Install mise (if not already installed)
+# 3. Install mise
 #
-if ! command -v mise > /dev/null 2>&1; then
-    echo "Installing mise..."
-    curl -fsSL https://mise.run | sh
+if ! command -v mise >/dev/null 2>&1; then
+  log_info "Installing mise..."
+  curl -fsSL https://mise.run | sh
 fi
-# Ensure mise is in PATH (handles fresh install)
 export PATH="$HOME/.local/bin:$PATH"
 
 #
-# 3. Install chezmoi via mise
+# 4. Install chezmoi via mise
 #
-echo "Installing chezmoi..."
+log_info "Installing chezmoi..."
 mise use -g chezmoi@latest
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 
 #
-# 4. Update source repo if it exists (chezmoi init won't pull)
+# 5. Update source repo if exists
 #
 if [ -d ~/.local/share/chezmoi/.git ]; then
-    echo "Updating dotfiles repo..."
-    git -C ~/.local/share/chezmoi pull --ff-only --quiet
+  log_info "Updating dotfiles repo..."
+  git -C ~/.local/share/chezmoi pull --ff-only --quiet
 fi
 
 #
-# 5. Remove old config to force template re-evaluation
-#    (Otherwise chezmoi uses stale config, ignoring env var and new fields)
+# 6. Remove stale config to force template re-evaluation
 #
 rm -f ~/.config/chezmoi/chezmoi.toml
 
 #
-# 6. Initialize and apply
-#    - Clones repo if source doesn't exist
-#    - Regenerates config from template (uses OP_SERVICE_ACCOUNT_TOKEN env var)
-#    - Applies dotfiles
+# 7. Initialize and apply
 #
-echo "Applying dotfiles..."
+log_info "Applying dotfiles..."
 if ! chezmoi init --apply BerryBolt/dotfiles; then
-    echo ""
-    echo "=== Bootstrap failed or aborted ==="
-    exit 1
+  log_error "Bootstrap failed"
 fi
 
 echo ""
-echo "=== Bootstrap complete ==="
-echo "Restart your shell: exec \$SHELL"
+log_success "Bootstrap complete"
+echo "    Restart your shell: exec \$SHELL"
+echo ""
