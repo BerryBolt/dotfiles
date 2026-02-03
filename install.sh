@@ -273,7 +273,14 @@ review_and_edit() {
     fi
 
     case "$choice" in
-      "Confirm") break ;;
+      "Confirm")
+        if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+          log_info "1Password token required before continuing"
+          prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
+          continue
+        fi
+        break
+        ;;
       "Edit agent name") prompt_string "Agent name" AGENT_NAME "Berry Bolt" ;;
       "Edit agent email") prompt_string "Agent email" AGENT_EMAIL "you@example.com" ;;
       "Edit GitHub handle") prompt_string "GitHub handle" AGENT_HANDLE_GITHUB "BerryBolt" ;;
@@ -356,10 +363,11 @@ else
     prompt_string "1Password vault name" OP_VAULT "Berry Bolt"
   fi
   if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-    log_info "1Password service account token required"
     echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
     echo ""
     prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
+  else
+    log_info "1Password token detected (you can edit in review)"
   fi
   if [ -z "$CHEZMOI_AI_CLI" ]; then
     prompt_choice "AI CLI to install" CHEZMOI_AI_CLI "claude" "codex" "none"
