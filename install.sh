@@ -66,6 +66,10 @@ require_cmd() {
   fi
 }
 
+is_tty() {
+  [ -r /dev/tty ]
+}
+
 ensure_mise_tool() {
   local tool="$1"
   local spec="${2:-${1}@latest}"
@@ -82,6 +86,202 @@ ensure_mise_tool() {
   if ! command -v "$binary" >/dev/null 2>&1; then
     log_error "${label} not found. Install ${label} and re-run."
   fi
+}
+
+prompt_string() {
+  local label="$1"
+  local varname="$2"
+  local placeholder="${3:-}"
+  local current="${!varname:-}"
+  local input=""
+
+  if ! is_tty; then
+    log_error "No terminal available. Set $varname env var."
+  fi
+
+  log_info "$label"
+  if [ -n "$current" ]; then
+    echo "    Current: $current"
+    echo "    Leave blank to keep."
+  fi
+
+  if command -v gum >/dev/null 2>&1; then
+    if [ -n "$placeholder" ]; then
+      input=$(gum input --placeholder "$placeholder" < /dev/tty) || abort
+    else
+      input=$(gum input < /dev/tty) || abort
+    fi
+  else
+    printf "    %s: " "$label"
+    read -r input < /dev/tty
+  fi
+
+  if [ -z "$input" ] && [ -n "$current" ]; then
+    input="$current"
+  fi
+
+  if [ -z "$input" ]; then
+    log_error "$label is required"
+  fi
+
+  printf -v "$varname" "%s" "$input"
+  echo "    ✓ $label: ${!varname}"
+}
+
+prompt_secret() {
+  local label="$1"
+  local varname="$2"
+  local current="${!varname:-}"
+  local input=""
+
+  if ! is_tty; then
+    log_error "No terminal available. Set $varname env var."
+  fi
+
+  log_info "$label"
+  if [ -n "$current" ]; then
+    echo "    Token already set. Leave blank to keep."
+  fi
+
+  if command -v gum >/dev/null 2>&1; then
+    input=$(gum input --password --placeholder "Enter token..." < /dev/tty) || abort
+  else
+    printf "    Enter token: "
+    read -rs input < /dev/tty
+    echo ""
+  fi
+
+  if [ -z "$input" ] && [ -n "$current" ]; then
+    input="$current"
+  fi
+
+  if [ -z "$input" ]; then
+    log_error "$label is required"
+  fi
+
+  printf -v "$varname" "%s" "$input"
+  echo "    ✓ Token captured"
+}
+
+prompt_choice() {
+  local label="$1"
+  local varname="$2"
+  shift 2
+  local choices=("$@")
+  local current="${!varname:-}"
+  local input=""
+
+  if ! is_tty; then
+    log_error "No terminal available. Set $varname env var."
+  fi
+
+  log_info "$label"
+  if [ -n "$current" ]; then
+    echo "    Current: $current"
+    echo "    Press Enter to keep current selection."
+    local reordered=("$current")
+    local choice
+    for choice in "${choices[@]}"; do
+      [ "$choice" = "$current" ] && continue
+      reordered+=("$choice")
+    done
+    choices=("${reordered[@]}")
+  fi
+
+  if command -v gum >/dev/null 2>&1; then
+    input=$(gum choose --header "$label" "${choices[@]}" < /dev/tty) || abort
+  else
+    local i=1
+    local choice
+    for choice in "${choices[@]}"; do
+      echo "    $i) $choice"
+      i=$((i + 1))
+    done
+    printf "    Enter choice [1-%d]: " "${#choices[@]}"
+    read -r selection < /dev/tty
+    if [ -z "$selection" ] && [ -n "$current" ]; then
+      input="$current"
+    else
+      case "$selection" in
+        1) input="${choices[0]}" ;;
+        2) input="${choices[1]}" ;;
+        3) input="${choices[2]}" ;;
+        *) input="${choices[$((${#choices[@]} - 1))]}" ;;
+      esac
+    fi
+  fi
+
+  if [ -z "$input" ]; then
+    log_error "$label is required"
+  fi
+
+  printf -v "$varname" "%s" "$input"
+  echo "    ✓ $label: ${!varname}"
+}
+
+review_and_edit() {
+  local choice=""
+  while :; do
+    echo ""
+    log_info "Review your choices"
+    echo "    Agent name: $AGENT_NAME"
+    echo "    Agent email: $AGENT_EMAIL"
+    echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
+    echo "    1Password vault: $OP_VAULT"
+    echo "    AI CLI: $CHEZMOI_AI_CLI"
+    if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+      local tail="${OP_SERVICE_ACCOUNT_TOKEN: -4}"
+      if [ "${#OP_SERVICE_ACCOUNT_TOKEN}" -le 4 ]; then
+        echo "    Token: set (${tail})"
+      else
+        echo "    Token: set (…${tail})"
+      fi
+    else
+      echo "    Token: missing"
+    fi
+    echo ""
+
+    if command -v gum >/dev/null 2>&1; then
+      choice=$(gum choose --header "Review & edit" \
+        "Confirm" \
+        "Edit agent name" \
+        "Edit agent email" \
+        "Edit GitHub handle" \
+        "Edit 1Password vault" \
+        "Edit token" \
+        "Edit AI CLI" < /dev/tty) || abort
+    else
+      echo "    1) Confirm"
+      echo "    2) Edit agent name"
+      echo "    3) Edit agent email"
+      echo "    4) Edit GitHub handle"
+      echo "    5) Edit 1Password vault"
+      echo "    6) Edit token"
+      echo "    7) Edit AI CLI"
+      printf "    Enter choice [1-7]: "
+      read -r selection < /dev/tty
+      case "$selection" in
+        1) choice="Confirm" ;;
+        2) choice="Edit agent name" ;;
+        3) choice="Edit agent email" ;;
+        4) choice="Edit GitHub handle" ;;
+        5) choice="Edit 1Password vault" ;;
+        6) choice="Edit token" ;;
+        7) choice="Edit AI CLI" ;;
+        *) choice="Confirm" ;;
+      esac
+    fi
+
+    case "$choice" in
+      "Confirm") break ;;
+      "Edit agent name") prompt_string "Agent name" AGENT_NAME "Berry Bolt" ;;
+      "Edit agent email") prompt_string "Agent email" AGENT_EMAIL "you@example.com" ;;
+      "Edit GitHub handle") prompt_string "GitHub handle" AGENT_HANDLE_GITHUB "BerryBolt" ;;
+      "Edit 1Password vault") prompt_string "1Password vault name" OP_VAULT "Berry Bolt" ;;
+      "Edit token") prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN ;;
+      "Edit AI CLI") prompt_choice "AI CLI to install" CHEZMOI_AI_CLI "claude" "codex" "none" ;;
+    esac
+  done
 }
 
 require_cmd curl "Install curl and re-run."
@@ -109,53 +309,70 @@ fi
 log_header
 
 #
-# 2. Get 1Password token
+# 2. Collect setup inputs
 #
-if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
-  log_info "1Password service account token required"
-  echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
-  echo ""
+AGENT_NAME="${CHEZMOI_AGENT_NAME:-}"
+AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
+AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
+OP_VAULT="${CHEZMOI_OP_VAULT:-}"
+OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
 
-  if command -v gum >/dev/null 2>&1; then
-    OP_SERVICE_ACCOUNT_TOKEN=$(gum input --password --placeholder "Enter token...") || abort
-  elif [ -e /dev/tty ]; then
-    printf "    Enter token: "
-    read -rs OP_SERVICE_ACCOUNT_TOKEN < /dev/tty
-    echo ""
-  else
-    log_error "No terminal available. Set OP_SERVICE_ACCOUNT_TOKEN env var."
+ai_cli_env="${CHEZMOI_AI_CLI:-}"
+if [ -n "$ai_cli_env" ]; then
+  ai_cli_env="$(printf "%s" "$ai_cli_env" | tr '[:upper:]' '[:lower:]')"
+fi
+case "$ai_cli_env" in
+  claude|claude-code) CHEZMOI_AI_CLI="claude" ;;
+  codex|none) CHEZMOI_AI_CLI="$ai_cli_env" ;;
+  *) CHEZMOI_AI_CLI="" ;;
+esac
+
+if ! is_tty; then
+  missing=()
+  [ -z "$AGENT_NAME" ] && missing+=("CHEZMOI_AGENT_NAME")
+  [ -z "$AGENT_EMAIL" ] && missing+=("CHEZMOI_AGENT_EMAIL")
+  [ -z "$AGENT_HANDLE_GITHUB" ] && missing+=("CHEZMOI_AGENT_HANDLE_GITHUB")
+  [ -z "$OP_VAULT" ] && missing+=("CHEZMOI_OP_VAULT")
+  [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ] && missing+=("OP_SERVICE_ACCOUNT_TOKEN")
+
+  if [ "${#missing[@]}" -gt 0 ]; then
+    log_error "No terminal available. Set env vars: ${missing[*]}"
   fi
-fi
 
-if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
-  log_error "No token provided"
-fi
-export OP_SERVICE_ACCOUNT_TOKEN
-
-#
-# 3. Select AI CLI
-#
-if [ -z "${CHEZMOI_AI_CLI:-}" ]; then
-  log_info "Select AI CLI to install"
-  echo ""
-  if command -v gum >/dev/null 2>&1; then
-    CHEZMOI_AI_CLI=$(gum choose "claude" "codex" "none") || abort
-  elif [ -e /dev/tty ]; then
-    echo "    1) claude"
-    echo "    2) codex"
-    echo "    3) none"
-    printf "    Enter choice [1-3]: "
-    read -r choice < /dev/tty
-    case "$choice" in
-      1) CHEZMOI_AI_CLI="claude" ;;
-      2) CHEZMOI_AI_CLI="codex" ;;
-      *) CHEZMOI_AI_CLI="none" ;;
-    esac
-  else
-    log_info "No terminal available; defaulting to 'none'"
+  if [ -z "$CHEZMOI_AI_CLI" ]; then
     CHEZMOI_AI_CLI="none"
   fi
+else
+  if [ -z "$AGENT_NAME" ]; then
+    prompt_string "Agent name" AGENT_NAME "Berry Bolt"
+  fi
+  if [ -z "$AGENT_EMAIL" ]; then
+    prompt_string "Agent email" AGENT_EMAIL "you@example.com"
+  fi
+  if [ -z "$AGENT_HANDLE_GITHUB" ]; then
+    prompt_string "GitHub handle" AGENT_HANDLE_GITHUB "BerryBolt"
+  fi
+  if [ -z "$OP_VAULT" ]; then
+    prompt_string "1Password vault name" OP_VAULT "Berry Bolt"
+  fi
+  if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    log_info "1Password service account token required"
+    echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
+    echo ""
+    prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
+  fi
+  if [ -z "$CHEZMOI_AI_CLI" ]; then
+    prompt_choice "AI CLI to install" CHEZMOI_AI_CLI "claude" "codex" "none"
+  fi
+
+  review_and_edit
 fi
+
+export CHEZMOI_AGENT_NAME="$AGENT_NAME"
+export CHEZMOI_AGENT_EMAIL="$AGENT_EMAIL"
+export CHEZMOI_AGENT_HANDLE_GITHUB="$AGENT_HANDLE_GITHUB"
+export CHEZMOI_OP_VAULT="$OP_VAULT"
+export OP_SERVICE_ACCOUNT_TOKEN
 export CHEZMOI_AI_CLI
 
 #
