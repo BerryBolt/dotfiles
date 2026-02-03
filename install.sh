@@ -43,10 +43,11 @@ eval "$(~/.local/bin/mise activate bash)"
 # Install chezmoi via mise
 echo "Installing chezmoi..."
 mise use -g chezmoi@latest
+export PATH="$HOME/.local/share/mise/shims:$PATH"
 
 # Bootstrap dotfiles
 echo "Bootstrapping dotfiles..."
-if ! mise exec chezmoi -- init --apply BerryBolt/dotfiles; then
+if ! chezmoi init --apply BerryBolt/dotfiles; then
     echo ""
     echo "=== Bootstrap failed or aborted ==="
     exit 1
