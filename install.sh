@@ -130,6 +130,19 @@ fi
 export CHEZMOI_AI_CLI
 
 #
+# 3. Configure 1Password mode for service accounts (before init)
+#
+export CHEZMOI_ONEPASSWORD_MODE="service"
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi"
+config_file="$config_dir/chezmoi.toml"
+rm -f "$config_file"
+mkdir -p "$config_dir"
+cat > "$config_file" <<'EOF'
+[onepassword]
+  mode = "service"
+EOF
+
+#
 # 4. Install mise
 #
 if ! command -v mise >/dev/null 2>&1; then
@@ -166,12 +179,7 @@ if [ -d ~/.local/share/chezmoi/.git ]; then
 fi
 
 #
-# 7. Remove stale config to force template re-evaluation
-#
-rm -f ~/.config/chezmoi/chezmoi.toml
-
-#
-# 8. Initialize and apply
+# 7. Initialize and apply
 #
 log_info "Applying dotfiles..."
 require_cmd git "Install git and re-run."
