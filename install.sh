@@ -66,18 +66,47 @@ require_cmd() {
   fi
 }
 
+ensure_mise_tool() {
+  local tool="$1"
+  local spec="${2:-${1}@latest}"
+  local binary="${3:-$1}"
+  local label="${4:-$1}"
+
+  if ! command -v "$binary" >/dev/null 2>&1; then
+    log_info "Installing ${label} via mise..."
+    if ! mise use -g "$spec" >/dev/null 2>&1; then
+      log_error "Failed to install ${label} via mise"
+    fi
+  fi
+
+  if ! command -v "$binary" >/dev/null 2>&1; then
+    log_error "${label} not found. Install ${label} and re-run."
+  fi
+}
+
+require_cmd curl "Install curl and re-run."
+
 #
-# 1. Install gum for enhanced prompts
+# 1. Install mise
 #
+if ! command -v mise >/dev/null 2>&1; then
+  log_info "Installing mise..."
+  curl -fsSL https://mise.run | sh
+fi
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+if ! command -v mise >/dev/null 2>&1; then
+  log_error "mise installation failed or not on PATH"
+fi
+
+# Optional: install gum via mise for enhanced prompts
 if ! command -v gum >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    log_info "Installing gum..."
-    brew install gum >/dev/null 2>&1
+  if ! mise use -g gum@latest >/dev/null 2>&1; then
+    log_info "gum not available via mise; continuing without it."
   fi
 fi
 
 log_header
-require_cmd curl "Install curl and re-run."
 
 #
 # 2. Get 1Password token
@@ -130,7 +159,7 @@ fi
 export CHEZMOI_AI_CLI
 
 #
-# 3. Configure 1Password mode for service accounts (before init)
+# 4. Configure 1Password mode for service accounts (before init)
 #
 export CHEZMOI_ONEPASSWORD_MODE="service"
 config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi"
@@ -143,46 +172,35 @@ cat > "$config_file" <<'EOF'
 EOF
 
 #
-# 4. Install mise
-#
-if ! command -v mise >/dev/null 2>&1; then
-  log_info "Installing mise..."
-  curl -fsSL https://mise.run | sh
-fi
-export PATH="$HOME/.local/bin:$PATH"
-if ! command -v mise >/dev/null 2>&1; then
-  log_error "mise installation failed or not on PATH"
-fi
-
-#
 # 5. Install chezmoi via mise
 #
 log_info "Installing chezmoi..."
-mise use -g chezmoi@latest
-export PATH="$HOME/.local/share/mise/shims:$PATH"
-if ! command -v chezmoi >/dev/null 2>&1; then
-  log_error "chezmoi installation failed or not on PATH"
-fi
+ensure_mise_tool "chezmoi" "chezmoi@latest" "chezmoi" "chezmoi"
 
 #
-# 6. Update source repo if exists
+# 6. Install 1Password CLI (required for onepasswordRead)
+#
+ensure_mise_tool "1password-cli" "1password-cli@latest" "op" "1Password CLI (op)"
+
+#
+# 7. Ensure git (required for update and init)
+#
+ensure_mise_tool "git" "git@latest" "git" "git"
+
+#
+# 8. Update source repo if exists
 #
 if [ -d ~/.local/share/chezmoi/.git ]; then
   log_info "Updating dotfiles repo..."
-  if command -v git >/dev/null 2>&1; then
-    if ! git -C ~/.local/share/chezmoi pull --ff-only --quiet; then
-      log_error "git pull failed. Resolve local changes and re-run."
-    fi
-  else
-    log_error "git is required to update the dotfiles repo"
+  if ! git -C ~/.local/share/chezmoi pull --ff-only --quiet; then
+    log_error "git pull failed. Resolve local changes and re-run."
   fi
 fi
 
 #
-# 7. Initialize and apply
+# 9. Initialize and apply
 #
 log_info "Applying dotfiles..."
-require_cmd git "Install git and re-run."
 if ! chezmoi init --apply BerryBolt/dotfiles; then
   log_error "Bootstrap failed"
 fi
