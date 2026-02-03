@@ -47,10 +47,20 @@ export PATH="$HOME/.local/share/mise/shims:$PATH"
 
 # Bootstrap dotfiles
 echo "Bootstrapping dotfiles..."
-if ! chezmoi init --apply BerryBolt/dotfiles; then
-    echo ""
-    echo "=== Bootstrap failed or aborted ==="
-    exit 1
+if [ -d ~/.local/share/chezmoi ]; then
+    # Source exists, pull latest and apply
+    if ! chezmoi update; then
+        echo ""
+        echo "=== Bootstrap failed or aborted ==="
+        exit 1
+    fi
+else
+    # Fresh install
+    if ! chezmoi init --apply BerryBolt/dotfiles; then
+        echo ""
+        echo "=== Bootstrap failed or aborted ==="
+        exit 1
+    fi
 fi
 
 echo ""
