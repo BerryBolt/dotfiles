@@ -1,6 +1,6 @@
 #!/bin/sh
 # One-line bootstrap for Berry Bolt dotfiles
-# Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
 
 set -eu
 
