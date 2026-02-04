@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 # One-line bootstrap for Berry Bolt dotfiles
 # Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | bash
 
-set -euo pipefail
+set -eu
 
 abort() {
   echo ""
@@ -55,8 +55,8 @@ log_header() {
 }
 
 require_cmd() {
-  local cmd="$1"
-  local hint="${2:-}"
+  cmd=$1
+  hint=${2-}
   if ! command -v "$cmd" >/dev/null 2>&1; then
     if [ -n "$hint" ]; then
       log_error "Missing required command: $cmd. $hint"
@@ -70,11 +70,18 @@ is_tty() {
   [ -r /dev/tty ]
 }
 
+is_blank() {
+  case ${1-} in
+    *[![:space:]]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 ensure_mise_tool() {
-  local tool="$1"
-  local spec="${2:-${1}@latest}"
-  local binary="${3:-$1}"
-  local label="${4:-$1}"
+  tool=$1
+  spec=${2-"$tool@latest"}
+  binary=${3-"$tool"}
+  label=${4-"$tool"}
 
   if ! command -v "$binary" >/dev/null 2>&1; then
     log_info "Installing ${label} via mise..."
@@ -88,22 +95,20 @@ ensure_mise_tool() {
   fi
 }
 
-is_blank() {
-  case "${1-}" in
-    *[!$' \t\r\n']*) return 1 ;;
-    *) return 0 ;;
-  esac
+PROMPT_VALUE=""
+
+mask_token() {
+  printf '%s' "$1" | awk '{ l=length($0); if (l<=4) print $0; else print "..." substr($0,l-3) }'
 }
 
 prompt_string() {
-  local label="$1"
-  local varname="$2"
-  local placeholder="${3:-}"
-  local current="${!varname:-}"
-  local input=""
+  label=$1
+  placeholder=$2
+  current=$3
+  input=""
 
   if ! is_tty; then
-    log_error "No terminal available. Set $varname env var."
+    log_error "No terminal available. Set required env vars."
   fi
 
   log_info "$label"
@@ -123,26 +128,25 @@ prompt_string() {
     read -r input < /dev/tty
   fi
 
-  if [ -z "$input" ] && [ -n "$current" ]; then
-    input="$current"
+  if is_blank "$input" && [ -n "$current" ]; then
+    input=$current
   fi
 
-  if [ -z "$input" ]; then
+  if is_blank "$input"; then
     log_error "$label is required"
   fi
 
-  printf -v "$varname" "%s" "$input"
-  echo "    ✓ $label: ${!varname}"
+  PROMPT_VALUE=$input
+  echo "    ✓ $label: $PROMPT_VALUE"
 }
 
 prompt_secret() {
-  local label="$1"
-  local varname="$2"
-  local current="${!varname:-}"
-  local input=""
+  label=$1
+  current=$2
+  input=""
 
   if ! is_tty; then
-    log_error "No terminal available. Set $varname env var."
+    log_error "No terminal available. Set required env vars."
   fi
 
   log_info "$label"
@@ -154,80 +158,76 @@ prompt_secret() {
     input=$(gum input --password --placeholder "Enter token..." < /dev/tty) || abort
   else
     printf "    Enter token: "
-    read -rs input < /dev/tty
+    stty -echo < /dev/tty 2>/dev/null || true
+    read -r input < /dev/tty
+    stty echo < /dev/tty 2>/dev/null || true
     echo ""
   fi
 
-  if [ -z "$input" ] && [ -n "$current" ]; then
-    input="$current"
+  if is_blank "$input" && [ -n "$current" ]; then
+    input=$current
   fi
 
-  if [ -z "$input" ]; then
+  if is_blank "$input"; then
     log_error "$label is required"
   fi
 
-  printf -v "$varname" "%s" "$input"
+  PROMPT_VALUE=$input
   echo "    ✓ Token captured"
 }
 
-prompt_choice() {
-  local label="$1"
-  local varname="$2"
-  shift 2
-  local choices=("$@")
-  local current="${!varname:-}"
-  local input=""
+prompt_ai_cli() {
+  current=$1
+  label="AI CLI to install"
+  choice=""
 
   if ! is_tty; then
-    log_error "No terminal available. Set $varname env var."
+    log_error "No terminal available. Set CHEZMOI_AI_CLI env var."
   fi
 
   log_info "$label"
   if [ -n "$current" ]; then
     echo "    Current: $current"
     echo "    Press Enter to keep current selection."
-    local reordered=("$current")
-    local choice
-    for choice in "${choices[@]}"; do
-      [ "$choice" = "$current" ] && continue
-      reordered+=("$choice")
-    done
-    choices=("${reordered[@]}")
   fi
 
+  case "$current" in
+    claude) first="claude"; second="codex"; third="none" ;;
+    codex) first="codex"; second="claude"; third="none" ;;
+    none) first="none"; second="claude"; third="codex" ;;
+    *) first="claude"; second="codex"; third="none" ;;
+  esac
+
   if command -v gum >/dev/null 2>&1; then
-    input=$(gum choose --header "$label" "${choices[@]}" < /dev/tty) || abort
+    choice=$(gum choose --header "$label" "$first" "$second" "$third" < /dev/tty) || abort
   else
-    local i=1
-    local choice
-    for choice in "${choices[@]}"; do
-      echo "    $i) $choice"
-      i=$((i + 1))
-    done
-    printf "    Enter choice [1-%d]: " "${#choices[@]}"
+    echo "    1) $first"
+    echo "    2) $second"
+    echo "    3) $third"
+    printf "    Enter choice [1-3]: "
     read -r selection < /dev/tty
-    if [ -z "$selection" ] && [ -n "$current" ]; then
-      input="$current"
+    if is_blank "$selection" && [ -n "$current" ]; then
+      choice=$current
     else
       case "$selection" in
-        1) input="${choices[0]}" ;;
-        2) input="${choices[1]}" ;;
-        3) input="${choices[2]}" ;;
-        *) input="${choices[$((${#choices[@]} - 1))]}" ;;
+        1) choice=$first ;;
+        2) choice=$second ;;
+        3) choice=$third ;;
+        *) choice=$third ;;
       esac
     fi
   fi
 
-  if [ -z "$input" ]; then
+  if is_blank "$choice"; then
     log_error "$label is required"
   fi
 
-  printf -v "$varname" "%s" "$input"
-  echo "    ✓ $label: ${!varname}"
+  PROMPT_VALUE=$choice
+  echo "    ✓ $label: $PROMPT_VALUE"
 }
 
 review_and_edit() {
-  local choice=""
+  choice=""
   while :; do
     echo ""
     log_info "Review your choices"
@@ -237,12 +237,8 @@ review_and_edit() {
     echo "    1Password vault: $OP_VAULT"
     echo "    AI CLI: $CHEZMOI_AI_CLI"
     if ! is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
-      local tail="${OP_SERVICE_ACCOUNT_TOKEN: -4}"
-      if [ "${#OP_SERVICE_ACCOUNT_TOKEN}" -le 4 ]; then
-        echo "    Token: set (${tail})"
-      else
-        echo "    Token: set (…${tail})"
-      fi
+      tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
+      echo "    Token: set ($tail)"
     else
       echo "    Token: missing"
     fi
@@ -283,17 +279,36 @@ review_and_edit() {
       "Confirm")
         if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
           log_info "1Password token required before continuing"
-          prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
+          prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
+          OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
           continue
         fi
         break
         ;;
-      "Edit agent name") prompt_string "Agent name" AGENT_NAME "Berry Bolt" ;;
-      "Edit agent email") prompt_string "Agent email" AGENT_EMAIL "you@example.com" ;;
-      "Edit GitHub handle") prompt_string "GitHub handle" AGENT_HANDLE_GITHUB "BerryBolt" ;;
-      "Edit 1Password vault") prompt_string "1Password vault name" OP_VAULT "Berry Bolt" ;;
-      "Edit token") prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN ;;
-      "Edit AI CLI") prompt_choice "AI CLI to install" CHEZMOI_AI_CLI "claude" "codex" "none" ;;
+      "Edit agent name")
+        prompt_string "Agent name" "Berry Bolt" "$AGENT_NAME"
+        AGENT_NAME=$PROMPT_VALUE
+        ;;
+      "Edit agent email")
+        prompt_string "Agent email" "you@example.com" "$AGENT_EMAIL"
+        AGENT_EMAIL=$PROMPT_VALUE
+        ;;
+      "Edit GitHub handle")
+        prompt_string "GitHub handle" "BerryBolt" "$AGENT_HANDLE_GITHUB"
+        AGENT_HANDLE_GITHUB=$PROMPT_VALUE
+        ;;
+      "Edit 1Password vault")
+        prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
+        OP_VAULT=$PROMPT_VALUE
+        ;;
+      "Edit token")
+        prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
+        OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
+        ;;
+      "Edit AI CLI")
+        prompt_ai_cli "$CHEZMOI_AI_CLI"
+        CHEZMOI_AI_CLI=$PROMPT_VALUE
+        ;;
     esac
   done
 }
@@ -333,6 +348,9 @@ OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
 if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
   OP_SERVICE_ACCOUNT_TOKEN=""
 fi
+if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
+  OP_SERVICE_ACCOUNT_TOKEN=""
+fi
 
 ai_cli_env="${CHEZMOI_AI_CLI:-}"
 if [ -n "$ai_cli_env" ]; then
@@ -345,44 +363,48 @@ case "$ai_cli_env" in
 esac
 
 if ! is_tty; then
-  missing=()
-  [ -z "$AGENT_NAME" ] && missing+=("CHEZMOI_AGENT_NAME")
-  [ -z "$AGENT_EMAIL" ] && missing+=("CHEZMOI_AGENT_EMAIL")
-  [ -z "$AGENT_HANDLE_GITHUB" ] && missing+=("CHEZMOI_AGENT_HANDLE_GITHUB")
-  [ -z "$OP_VAULT" ] && missing+=("CHEZMOI_OP_VAULT")
-  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
-    missing+=("OP_SERVICE_ACCOUNT_TOKEN")
+  missing=""
+  is_blank "$AGENT_NAME" && missing="$missing CHEZMOI_AGENT_NAME"
+  is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
+  is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
+  is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
+  is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
+
+  if [ -n "$missing" ]; then
+    log_error "No terminal available. Set env vars:$missing"
   fi
 
-  if [ "${#missing[@]}" -gt 0 ]; then
-    log_error "No terminal available. Set env vars: ${missing[*]}"
-  fi
-
-  if [ -z "$CHEZMOI_AI_CLI" ]; then
+  if is_blank "$CHEZMOI_AI_CLI"; then
     CHEZMOI_AI_CLI="none"
   fi
 else
-  if [ -z "$AGENT_NAME" ]; then
-    prompt_string "Agent name" AGENT_NAME "Berry Bolt"
+  if is_blank "$AGENT_NAME"; then
+    prompt_string "Agent name" "Berry Bolt" "$AGENT_NAME"
+    AGENT_NAME=$PROMPT_VALUE
   fi
-  if [ -z "$AGENT_EMAIL" ]; then
-    prompt_string "Agent email" AGENT_EMAIL "you@example.com"
+  if is_blank "$AGENT_EMAIL"; then
+    prompt_string "Agent email" "you@example.com" "$AGENT_EMAIL"
+    AGENT_EMAIL=$PROMPT_VALUE
   fi
-  if [ -z "$AGENT_HANDLE_GITHUB" ]; then
-    prompt_string "GitHub handle" AGENT_HANDLE_GITHUB "BerryBolt"
+  if is_blank "$AGENT_HANDLE_GITHUB"; then
+    prompt_string "GitHub handle" "BerryBolt" "$AGENT_HANDLE_GITHUB"
+    AGENT_HANDLE_GITHUB=$PROMPT_VALUE
   fi
-  if [ -z "$OP_VAULT" ]; then
-    prompt_string "1Password vault name" OP_VAULT "Berry Bolt"
+  if is_blank "$OP_VAULT"; then
+    prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
+    OP_VAULT=$PROMPT_VALUE
   fi
   if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
     echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
     echo ""
-    prompt_secret "1Password service account token" OP_SERVICE_ACCOUNT_TOKEN
+    prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
+    OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
   else
     log_info "1Password token detected (you can edit in review)"
   fi
-  if [ -z "$CHEZMOI_AI_CLI" ]; then
-    prompt_choice "AI CLI to install" CHEZMOI_AI_CLI "claude" "codex" "none"
+  if is_blank "$CHEZMOI_AI_CLI"; then
+    prompt_ai_cli "$CHEZMOI_AI_CLI"
+    CHEZMOI_AI_CLI=$PROMPT_VALUE
   fi
 
   review_and_edit
