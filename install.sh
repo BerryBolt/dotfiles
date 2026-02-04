@@ -1,10 +1,50 @@
 #!/bin/sh
 # One-line bootstrap for Berry Bolt dotfiles
-# Usage: curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
+# Usage:
+#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh)"
+#   # or
+#   curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
 
 set -eu
 
+SCRIPT_URL="https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh"
+NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh)"
+  # or
+  curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
+
+Env overrides:
+  CHEZMOI_AGENT_NAME=...
+  CHEZMOI_AGENT_EMAIL=...
+  CHEZMOI_AGENT_HANDLE_GITHUB=...
+  CHEZMOI_OP_VAULT=...
+  OP_SERVICE_ACCOUNT_TOKEN=...
+  CHEZMOI_AI_CLI=claude|codex|none
+
+Optional:
+  CHEZMOI_NONINTERACTIVE=1  # disable prompts (requires all env vars)
+  --non-interactive         # same as above
+EOF
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --non-interactive|--unattended)
+      NONINTERACTIVE=1
+      ;;
+  esac
+done
+
 abort() {
+  stty echo < /dev/tty 2>/dev/null || true
   echo ""
   printf "\033[0;31m✗ Aborted.\033[0m\n" >&2
   exit 130
@@ -43,12 +83,12 @@ log_header() {
   if command -v gum >/dev/null 2>&1; then
     gum style --border rounded --padding "1 2" --margin "1 0" --align center --bold \
       --foreground 212 --border-foreground 57 \
-      "BERRY BOLT DOTFILES" "bootstrap protocol v1"
+      "BERRY BOLT DOTFILES" "guided setup console"
   else
     echo ""
     printf "=====================================\n"
     printf " BERRY BOLT DOTFILES\n"
-    printf " bootstrap protocol v1\n"
+    printf " guided setup console\n"
     printf "=====================================\n"
     echo ""
   fi
@@ -66,8 +106,36 @@ require_cmd() {
   fi
 }
 
-is_tty() {
-  [ -r /dev/tty ]
+TTY_DEV=""
+
+detect_tty() {
+  TTY_DEV=""
+  if command -v tty >/dev/null 2>&1; then
+    if tty >/dev/null 2>&1; then
+      TTY_DEV="/dev/tty"
+      return
+    fi
+  fi
+  if [ -r /dev/tty ]; then
+    TTY_DEV="/dev/tty"
+    return
+  fi
+  if [ -t 0 ]; then
+    TTY_DEV="/dev/stdin"
+  fi
+}
+
+has_tty() {
+  [ -n "$TTY_DEV" ]
+}
+
+require_tty() {
+  detect_tty
+  if ! has_tty; then
+    log_error "No terminal detected.
+This installer is interactive. Run it from a TTY or set env vars.
+Tip: sh -c \"\$(curl -fsSL $SCRIPT_URL)\""
+  fi
 }
 
 is_blank() {
@@ -101,43 +169,57 @@ mask_token() {
   printf '%s' "$1" | awk '{ l=length($0); if (l<=4) print $0; else print "..." substr($0,l-3) }'
 }
 
+normalize_ai_cli() {
+  value=${1-}
+  if [ -n "$value" ]; then
+    value=$(printf "%s" "$value" | tr '[:upper:]' '[:lower:]')
+  fi
+  case "$value" in
+    claude|claude-code) printf "%s" "claude" ;;
+    codex|none) printf "%s" "$value" ;;
+    *) printf "%s" "" ;;
+  esac
+}
+
 prompt_string() {
   label=$1
   placeholder=$2
   current=$3
   input=""
 
-  if ! is_tty; then
-    log_error "No terminal available. Set required env vars."
-  fi
+  require_tty
 
-  log_info "$label"
-  if [ -n "$current" ]; then
-    echo "    Current: $current"
-    echo "    Leave blank to keep."
-  fi
-
-  if command -v gum >/dev/null 2>&1; then
-    if [ -n "$placeholder" ]; then
-      input=$(gum input --placeholder "$placeholder" < /dev/tty) || abort
-    else
-      input=$(gum input < /dev/tty) || abort
+  while :; do
+    log_info "$label"
+    if [ -n "$current" ]; then
+      echo "    Current: $current"
+      echo "    Leave blank to keep."
     fi
-  else
-    printf "    %s: " "$label"
-    read -r input < /dev/tty
-  fi
 
-  if is_blank "$input" && [ -n "$current" ]; then
-    input=$current
-  fi
+    if command -v gum >/dev/null 2>&1; then
+      if [ -n "$placeholder" ]; then
+        input=$(gum input --placeholder "$placeholder" < "$TTY_DEV") || abort
+      else
+        input=$(gum input < "$TTY_DEV") || abort
+      fi
+    else
+      printf "    %s: " "$label"
+      read -r input < "$TTY_DEV" || abort
+    fi
 
-  if is_blank "$input"; then
-    log_error "$label is required"
-  fi
+    if is_blank "$input" && [ -n "$current" ]; then
+      input=$current
+    fi
 
-  PROMPT_VALUE=$input
-  echo "    ✓ $label: $PROMPT_VALUE"
+    if is_blank "$input"; then
+      log_info "Value required. Try again."
+      continue
+    fi
+
+    PROMPT_VALUE=$input
+    echo "    ✓ $label: $PROMPT_VALUE"
+    break
+  done
 }
 
 prompt_secret() {
@@ -145,35 +227,38 @@ prompt_secret() {
   current=$2
   input=""
 
-  if ! is_tty; then
-    log_error "No terminal available. Set required env vars."
-  fi
+  require_tty
 
-  log_info "$label"
-  if [ -n "$current" ]; then
-    echo "    Token already set. Leave blank to keep."
-  fi
+  while :; do
+    log_info "$label"
+    if [ -n "$current" ]; then
+      echo "    Token already set. Leave blank to keep."
+    fi
 
-  if command -v gum >/dev/null 2>&1; then
-    input=$(gum input --password --placeholder "Enter token..." < /dev/tty) || abort
-  else
-    printf "    Enter token: "
-    stty -echo < /dev/tty 2>/dev/null || true
-    read -r input < /dev/tty
-    stty echo < /dev/tty 2>/dev/null || true
-    echo ""
-  fi
+    if command -v gum >/dev/null 2>&1; then
+      input=$(gum input --password --placeholder "Enter token..." < "$TTY_DEV") || abort
+    else
+      printf "    Enter token: "
+      stty -echo < "$TTY_DEV" 2>/dev/null || true
+      read -r input < "$TTY_DEV" || abort
+      stty echo < "$TTY_DEV" 2>/dev/null || true
+      echo ""
+    fi
 
-  if is_blank "$input" && [ -n "$current" ]; then
-    input=$current
-  fi
+    if is_blank "$input" && [ -n "$current" ]; then
+      input=$current
+    fi
 
-  if is_blank "$input"; then
-    log_error "$label is required"
-  fi
+    if is_blank "$input"; then
+      log_info "Token required. Try again."
+      continue
+    fi
 
-  PROMPT_VALUE=$input
-  echo "    ✓ Token captured"
+    PROMPT_VALUE=$input
+    tail=$(mask_token "$PROMPT_VALUE")
+    echo "    ✓ Token set ($tail)"
+    break
+  done
 }
 
 prompt_ai_cli() {
@@ -181,53 +266,79 @@ prompt_ai_cli() {
   label="AI CLI to install"
   choice=""
 
-  if ! is_tty; then
-    log_error "No terminal available. Set CHEZMOI_AI_CLI env var."
-  fi
+  require_tty
 
-  log_info "$label"
-  if [ -n "$current" ]; then
-    echo "    Current: $current"
-    echo "    Press Enter to keep current selection."
-  fi
+  while :; do
+    log_info "$label"
+    echo "    Choose which AI CLI to install."
+    echo "    claude = Anthropic, codex = OpenAI, none = skip."
+    if [ -n "$current" ]; then
+      echo "    Current: $current"
+      echo "    Select keep current to leave unchanged."
+    fi
 
-  case "$current" in
-    claude) first="claude"; second="codex"; third="none" ;;
-    codex) first="codex"; second="claude"; third="none" ;;
-    none) first="none"; second="claude"; third="codex" ;;
-    *) first="claude"; second="codex"; third="none" ;;
-  esac
-
-  if command -v gum >/dev/null 2>&1; then
-    choice=$(gum choose --header "$label" "$first" "$second" "$third" < /dev/tty) || abort
-  else
-    echo "    1) $first"
-    echo "    2) $second"
-    echo "    3) $third"
-    printf "    Enter choice [1-3]: "
-    read -r selection < /dev/tty
-    if is_blank "$selection" && [ -n "$current" ]; then
-      choice=$current
+    if command -v gum >/dev/null 2>&1; then
+      if [ -n "$current" ]; then
+        choice=$(gum choose --header "$label" \
+          "keep current ($current)" \
+          "claude (Anthropic)" \
+          "codex (OpenAI)" \
+          "none" < "$TTY_DEV") || abort
+      else
+        choice=$(gum choose --header "$label" \
+          "claude (Anthropic)" \
+          "codex (OpenAI)" \
+          "none" < "$TTY_DEV") || abort
+      fi
     else
-      case "$selection" in
-        1) choice=$first ;;
-        2) choice=$second ;;
-        3) choice=$third ;;
-        *) choice=$third ;;
+      if [ -n "$current" ]; then
+        echo "    0) keep current ($current)"
+      fi
+      echo "    1) claude (Anthropic)"
+      echo "    2) codex (OpenAI)"
+      echo "    3) none"
+      printf "    Enter choice: "
+      read -r selection < "$TTY_DEV" || abort
+      if is_blank "$selection" && [ -n "$current" ]; then
+        choice="keep"
+      else
+        case "$selection" in
+          0) choice="keep" ;;
+          1) choice="claude" ;;
+          2) choice="codex" ;;
+          3) choice="none" ;;
+          *) choice="invalid" ;;
+        esac
+      fi
+      case "$choice" in
+        keep) choice="$current" ;;
+        invalid)
+          log_info "Invalid choice. Try again."
+          continue
+          ;;
       esac
     fi
-  fi
 
-  if is_blank "$choice"; then
-    log_error "$label is required"
-  fi
+    case "$choice" in
+      "keep current ("*) choice="$current" ;;
+      claude*) choice="claude" ;;
+      codex*) choice="codex" ;;
+      none*) choice="none" ;;
+      *)
+        log_info "Invalid choice. Try again."
+        continue
+        ;;
+    esac
 
-  PROMPT_VALUE=$choice
-  echo "    ✓ $label: $PROMPT_VALUE"
+    PROMPT_VALUE=$choice
+    echo "    ✓ $label: $PROMPT_VALUE"
+    break
+  done
 }
 
 review_and_edit() {
   choice=""
+  require_tty
   while :; do
     echo ""
     log_info "Review your choices"
@@ -252,7 +363,7 @@ review_and_edit() {
         "Edit GitHub handle" \
         "Edit 1Password vault" \
         "Edit token" \
-        "Edit AI CLI" < /dev/tty) || abort
+        "Edit AI CLI" < "$TTY_DEV") || abort
     else
       echo "    1) Confirm"
       echo "    2) Edit agent name"
@@ -262,7 +373,7 @@ review_and_edit() {
       echo "    6) Edit token"
       echo "    7) Edit AI CLI"
       printf "    Enter choice [1-7]: "
-      read -r selection < /dev/tty
+      read -r selection < "$TTY_DEV" || abort
       case "$selection" in
         1) choice="Confirm" ;;
         2) choice="Edit agent name" ;;
@@ -337,6 +448,8 @@ fi
 
 log_header
 
+log_info "Answer a few prompts. You can review and edit before apply."
+
 #
 # 2. Collect setup inputs
 #
@@ -348,34 +461,36 @@ OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
 if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
   OP_SERVICE_ACCOUNT_TOKEN=""
 fi
-if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
-  OP_SERVICE_ACCOUNT_TOKEN=""
-fi
 
-ai_cli_env="${CHEZMOI_AI_CLI:-}"
-if [ -n "$ai_cli_env" ]; then
-  ai_cli_env="$(printf "%s" "$ai_cli_env" | tr '[:upper:]' '[:lower:]')"
-fi
-case "$ai_cli_env" in
-  claude|claude-code) CHEZMOI_AI_CLI="claude" ;;
-  codex|none) CHEZMOI_AI_CLI="$ai_cli_env" ;;
-  *) CHEZMOI_AI_CLI="" ;;
-esac
+CHEZMOI_AI_CLI="$(normalize_ai_cli "${CHEZMOI_AI_CLI:-}")"
 
-if ! is_tty; then
+detect_tty
+
+if [ -n "$NONINTERACTIVE" ]; then
   missing=""
   is_blank "$AGENT_NAME" && missing="$missing CHEZMOI_AGENT_NAME"
   is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
   is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
   is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
   is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
+  is_blank "$CHEZMOI_AI_CLI" && missing="$missing CHEZMOI_AI_CLI"
 
   if [ -n "$missing" ]; then
-    log_error "No terminal available. Set env vars:$missing"
+    log_error "Non-interactive mode requires env vars:$missing"
   fi
+elif ! has_tty; then
+  missing=""
+  is_blank "$AGENT_NAME" && missing="$missing CHEZMOI_AGENT_NAME"
+  is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
+  is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
+  is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
+  is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
+  is_blank "$CHEZMOI_AI_CLI" && missing="$missing CHEZMOI_AI_CLI"
 
-  if is_blank "$CHEZMOI_AI_CLI"; then
-    CHEZMOI_AI_CLI="none"
+  if [ -n "$missing" ]; then
+    log_error "No terminal detected.
+Set env vars:$missing
+Tip: sh -c \"\$(curl -fsSL $SCRIPT_URL)\""
   fi
 else
   if is_blank "$AGENT_NAME"; then
