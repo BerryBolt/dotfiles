@@ -1,6 +1,8 @@
 # Dotfiles
 
-Chezmoi-managed dotfiles for AI agent environments. One-command bootstrap on fresh machines.
+Chezmoi-managed bootstrap for Berry Bolt agent environments.
+
+Targets `macOS`, `Linux`, and `WSL2`, following the same baseline assumptions as OpenClaw. The installer entrypoint is `bash`. macOS-only package steps are skipped automatically on other platforms.
 
 ## Quick start
 
@@ -8,58 +10,42 @@ Chezmoi-managed dotfiles for AI agent environments. One-command bootstrap on fre
 curl -fsSL https://berrybolt.bot/install.sh | bash
 ```
 
-You need a **1Password service account token** — see [1password-setup skill](skills/1password-setup/SKILL.md) to create one.
+You will need a **1Password service account token**. See [skills/1password-setup/SKILL.md](skills/1password-setup/SKILL.md).
 
-During setup you'll configure: agent name, email, GitHub handle, vault name, and AI CLI choice (claude / codex / none).
+The installer prompts for:
+- agent name
+- agent email
+- GitHub handle
+- 1Password vault name
+- AI CLI (`claude`, `codex`, or `none`)
 
-After bootstrap, restart your shell (`exec $SHELL`) and use your AI CLI to run skills from `skills/`.
+## Package sources
 
-## What gets installed
+- CLI tools are defined in [home/private_dot_config/mise/config.toml](home/private_dot_config/mise/config.toml)
+- macOS-specific GUI apps and system packages are defined in [home/Brewfile](home/Brewfile)
 
-### Dotfiles
-- `~/.zprofile` — Homebrew setup (macOS)
-- `~/.zshrc` — Shell config (mise, starship, zoxide, fzf)
-- `~/.gitconfig` — Git config with signing
-- `~/.config/mise/config.toml` — CLI tools
-- `~/.openclaw/*` — OpenClaw config (if using OpenClaw)
+## After install
 
-### CLI tools (via mise)
-- chezmoi, gh, starship, zoxide, fzf, jq, ripgrep
-- 1password-cli
-- tmux, cloudflared
-- Language runtimes (node, python, go, etc.) available but commented out - uncomment as needed
+- restart your shell: `exec $SHELL`
+- optional: clone workspace with `git clone git@github.com:BerryBolt/workspace.git ~/workspace`
+- optional: install [OpenClaw](https://openclaw.ai)
 
-### GUI apps + system deps (via Homebrew, macOS only)
-- 1password, brave-browser, claude, tailscale, antigravity
-- ffmpeg, whisper-cpp
+## Layout
 
-### Restored from 1Password
-- SSH key (`~/.ssh/id_ed25519`)
-
-## Post-bootstrap
-
-After the SSH key is restored from 1Password, the setup switches the chezmoi repo to the SSH remote automatically.
-
-Optional next steps:
-- Clone workspace: `git clone git@github.com:BerryBolt/workspace.git ~/workspace`
-- Install [OpenClaw](https://openclaw.ai) if you want an alternative to Claude Code / Codex
-
-## Structure
-
-```
-home/           # Chezmoi source (dotfiles, scripts, Brewfile)
-policies/       # Operations manual for AI agents
+```text
+home/           # chezmoi source: dotfiles, scripts, Brewfile
+policies/       # operations manual for AI agents
 skills/         # AI-executable procedures
-install.sh      # One-liner bootstrap script
+install.sh      # bootstrap entrypoint
 ```
 
 ## For AI agents
 
 This repo includes:
-- **[policies/](policies/)** — Self-serve operations manual (credentials, dependencies, dotfiles, git)
-- **[skills/](skills/)** — AI-executable procedures in [agentskills.io](https://agentskills.io) format
+- [policies/](policies/) for credentials, dependencies, dotfiles, and git workflows
+- [skills/](skills/) in [agentskills.io](https://agentskills.io) format
 
-These dotfiles are templated for multiple agents. Each agent has separate macOS user + 1Password vault, same repo.
+These dotfiles are templated for multiple agents. Each agent has a separate OS user and 1Password vault, but shares the same repo.
 
 ## License
 

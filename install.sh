@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # One-line bootstrap for Berry Bolt dotfiles
 # Usage:
 #   curl -fsSL https://berrybolt.bot/install.sh | bash
 
-set -eu
+set -euo pipefail
 
 SCRIPT_URL="https://berrybolt.bot/install.sh"
 NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
@@ -47,47 +47,26 @@ abort() {
 }
 trap abort INT TERM
 
-#
-# Logging (with gum support and fallback)
-#
 log_info() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 75 --bold "→ $*"
-  else
-    printf "\033[0;34m→ %s\033[0m\n" "$*"
-  fi
+  printf "\033[0;34m→ %s\033[0m\n" "$*"
 }
 
 log_success() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 82 --bold "✓ $*"
-  else
-    printf "\033[0;32m✓ %s\033[0m\n" "$*"
-  fi
+  printf "\033[0;32m✓ %s\033[0m\n" "$*"
 }
 
 log_error() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --foreground 196 --bold "✗ $*"
-  else
-    printf "\033[0;31m✗ %s\033[0m\n" "$*" >&2
-  fi
+  printf "\033[0;31m✗ %s\033[0m\n" "$*" >&2
   exit 1
 }
 
 log_header() {
-  if command -v gum >/dev/null 2>&1; then
-    gum style --border rounded --padding "1 2" --margin "1 0" --align center --bold \
-      --foreground 212 --border-foreground 57 \
-      "BERRY BOLT DOTFILES" "guided setup console"
-  else
-    echo ""
-    printf "=====================================\n"
-    printf " BERRY BOLT DOTFILES\n"
-    printf " guided setup console\n"
-    printf "=====================================\n"
-    echo ""
-  fi
+  echo ""
+  printf "=====================================\n"
+  printf " BERRY BOLT DOTFILES\n"
+  printf " guided setup console\n"
+  printf "=====================================\n"
+  echo ""
 }
 
 require_cmd() {
@@ -191,24 +170,13 @@ prompt_string() {
 
   while :; do
     if [ -n "$current" ]; then
-      echo "    Current: $current"
-      echo "    Leave blank to keep."
+      printf "\033[0;34m→ %s [%s]:\033[0m " "$label" "$current"
     elif [ -n "$placeholder" ]; then
-      echo "    Default: $placeholder"
-    fi
-
-    if command -v gum >/dev/null 2>&1; then
-      if [ -n "$current" ]; then
-        input=$(gum input --prompt "$label: " --value "$current" --char-limit 0 --width 0 < "$TTY_DEV") || abort
-      elif [ -n "$placeholder" ]; then
-        input=$(gum input --prompt "$label: " --value "$placeholder" --char-limit 0 --width 0 < "$TTY_DEV") || abort
-      else
-        input=$(gum input --prompt "$label: " --char-limit 0 --width 0 < "$TTY_DEV") || abort
-      fi
+      printf "\033[0;34m→ %s [%s]:\033[0m " "$label" "$placeholder"
     else
       printf "\033[0;34m→ %s:\033[0m " "$label"
-      read -r input < "$TTY_DEV" || abort
     fi
+    read -r input < "$TTY_DEV" || abort
 
     input=$(trim_space "$input")
     if is_blank "$input"; then
@@ -242,15 +210,11 @@ prompt_secret() {
       echo "    Token already set. Leave blank to keep."
     fi
 
-    if command -v gum >/dev/null 2>&1; then
-      input=$(gum input --password --prompt "$label: " --char-limit 0 --width 0 < "$TTY_DEV") || abort
-    else
-      printf "\033[0;34m→ %s:\033[0m " "$label"
-      stty -echo < "$TTY_DEV" 2>/dev/null || true
-      read -r input < "$TTY_DEV" || abort
-      stty echo < "$TTY_DEV" 2>/dev/null || true
-      echo ""
-    fi
+    printf "\033[0;34m→ %s:\033[0m " "$label"
+    stty -echo < "$TTY_DEV" 2>/dev/null || true
+    read -r input < "$TTY_DEV" || abort
+    stty echo < "$TTY_DEV" 2>/dev/null || true
+    echo ""
 
     if is_blank "$input" && [ -n "$current" ]; then
       input=$current
@@ -270,8 +234,8 @@ prompt_secret() {
 
 prompt_ai_cli() {
   current=$1
-  label="AI CLI to install"
   choice=""
+  selection=""
 
   require_tty
 
@@ -282,55 +246,43 @@ prompt_ai_cli() {
     if [ -n "$current" ]; then
       echo "    Current: $current"
       echo "    Select keep current to leave unchanged."
+      echo "    0) keep current ($current)"
     fi
+    echo "    1) claude (Anthropic)"
+    echo "    2) codex (OpenAI)"
+    echo "    3) none"
+    printf "    Enter choice: "
+    read -r selection < "$TTY_DEV" || abort
 
-    if command -v gum >/dev/null 2>&1; then
-      if [ -n "$current" ]; then
-        choice=$(gum choose --header "$label" \
-          "keep current ($current)" \
-          "claude (Anthropic)" \
-          "codex (OpenAI)" \
-          "none" < "$TTY_DEV") || abort
-      else
-        choice=$(gum choose --header "$label" \
-          "claude (Anthropic)" \
-          "codex (OpenAI)" \
-          "none" < "$TTY_DEV") || abort
-      fi
+    if is_blank "$selection" && [ -n "$current" ]; then
+      choice="$current"
     else
-      if [ -n "$current" ]; then
-        echo "    0) keep current ($current)"
-      fi
-      echo "    1) claude (Anthropic)"
-      echo "    2) codex (OpenAI)"
-      echo "    3) none"
-      printf "    Enter choice: "
-      read -r selection < "$TTY_DEV" || abort
-      if is_blank "$selection" && [ -n "$current" ]; then
-        choice="keep"
-      else
-        case "$selection" in
-          0) choice="keep" ;;
-          1) choice="claude" ;;
-          2) choice="codex" ;;
-          3) choice="none" ;;
-          *) choice="invalid" ;;
-        esac
-      fi
-      case "$choice" in
-        keep) choice="$current" ;;
-        invalid)
-          log_info "Invalid choice. Try again."
-          continue
+      case "$selection" in
+        0)
+          if [ -n "$current" ]; then
+            choice="$current"
+          else
+            choice="invalid"
+          fi
           ;;
+        1) choice="claude" ;;
+        2) choice="codex" ;;
+        3) choice="none" ;;
+        *) choice="invalid" ;;
       esac
     fi
 
     case "$choice" in
-      "keep current ("*) choice="$current" ;;
-      claude*) choice="claude" ;;
-      codex*) choice="codex" ;;
-      none*) choice="none" ;;
+      claude|codex|none)
+        ;;
+      "$current")
+        if [ -n "$current" ]; then
+          :
+        else
+          log_info "Invalid choice. Try again."
+          continue
+        fi
+        ;;
       *)
         log_info "Invalid choice. Try again."
         continue
@@ -338,7 +290,7 @@ prompt_ai_cli() {
     esac
 
     PROMPT_VALUE=$choice
-    echo "    ✓ $label: $PROMPT_VALUE"
+    echo "    ✓ AI CLI to install: $PROMPT_VALUE"
     break
   done
 }
@@ -362,36 +314,28 @@ review_and_edit() {
     fi
     echo ""
 
-    if command -v gum >/dev/null 2>&1; then
-      choice=$(gum choose --header "Review & edit" \
-        "Confirm" \
-        "Edit agent name" \
-        "Edit agent email" \
-        "Edit GitHub handle" \
-        "Edit 1Password vault" \
-        "Edit token" \
-        "Edit AI CLI" < "$TTY_DEV") || abort
-    else
-      echo "    1) Confirm"
-      echo "    2) Edit agent name"
-      echo "    3) Edit agent email"
-      echo "    4) Edit GitHub handle"
-      echo "    5) Edit 1Password vault"
-      echo "    6) Edit token"
-      echo "    7) Edit AI CLI"
-      printf "    Enter choice [1-7]: "
-      read -r selection < "$TTY_DEV" || abort
-      case "$selection" in
-        1) choice="Confirm" ;;
-        2) choice="Edit agent name" ;;
-        3) choice="Edit agent email" ;;
-        4) choice="Edit GitHub handle" ;;
-        5) choice="Edit 1Password vault" ;;
-        6) choice="Edit token" ;;
-        7) choice="Edit AI CLI" ;;
-        *) choice="Confirm" ;;
-      esac
-    fi
+    echo "    1) Confirm"
+    echo "    2) Edit agent name"
+    echo "    3) Edit agent email"
+    echo "    4) Edit GitHub handle"
+    echo "    5) Edit 1Password vault"
+    echo "    6) Edit token"
+    echo "    7) Edit AI CLI"
+    printf "    Enter choice [1-7]: "
+    read -r selection < "$TTY_DEV" || abort
+    case "$selection" in
+      1|"") choice="Confirm" ;;
+      2) choice="Edit agent name" ;;
+      3) choice="Edit agent email" ;;
+      4) choice="Edit GitHub handle" ;;
+      5) choice="Edit 1Password vault" ;;
+      6) choice="Edit token" ;;
+      7) choice="Edit AI CLI" ;;
+      *)
+        log_info "Invalid choice. Try again."
+        continue
+        ;;
+    esac
 
     case "$choice" in
       "Confirm")
@@ -444,13 +388,6 @@ export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 if ! command -v mise >/dev/null 2>&1; then
   log_error "mise installation failed or not on PATH"
-fi
-
-# Optional: install gum via mise for enhanced prompts
-if ! command -v gum >/dev/null 2>&1; then
-  if ! mise use -g gum@latest >/dev/null 2>&1; then
-    log_info "gum not available via mise; continuing without it."
-  fi
 fi
 
 log_header
