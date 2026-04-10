@@ -2,29 +2,9 @@
 # CLI tools are managed by mise (see ~/.config/mise/config.toml)
 # This file is for GUI apps and system dependencies only.
 
-# Entry point - mise manages everything else
-brew "mise"
-
 # System dependencies (need compilation or system libs)
-brew "tmux"
 brew "ffmpeg"
 brew "whisper-cpp"
-brew "cloudflared"
-
-# Custom taps (not available in mise)
-tap "antoniorodr/memo"
-tap "steipete/tap"
-tap "yakitrak/yakitrak"
-brew "antoniorodr/memo/memo"
-brew "steipete/tap/bird"
-brew "steipete/tap/gifgrep"
-brew "steipete/tap/gogcli"
-brew "steipete/tap/goplaces"
-brew "steipete/tap/peekaboo"
-brew "steipete/tap/remindctl"
-brew "steipete/tap/summarize"
-brew "yakitrak/yakitrak/obsidian-cli"
-brew "mole"
 
 # GUI apps (casks)
 cask "1password"

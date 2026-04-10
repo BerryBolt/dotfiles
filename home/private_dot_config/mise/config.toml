@@ -11,6 +11,8 @@ zoxide = "latest"
 fzf = "latest"
 jq = "latest"
 ripgrep = "latest"
+tmux = "latest"
+cloudflared = "latest"
 
 # 1Password CLI
 1password-cli = "latest"
