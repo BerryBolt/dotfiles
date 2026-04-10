@@ -76,7 +76,7 @@
     "telegram": {
       "enabled": true,
       "dmPolicy": "pairing",
-      "botToken": {{ onepasswordRead "op://Berry Bolt/Telegram Bot - API key/credential" | quote }},
+      "botToken": {{ onepasswordRead (printf "op://%s/Telegram Bot - API key/credential" .op_vault) | quote }},
       "groupPolicy": "allowlist",
       "streamMode": "partial"
     }

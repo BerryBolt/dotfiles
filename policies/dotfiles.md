@@ -59,7 +59,7 @@ Available in `.tmpl` files:
 
 ```
 {{ onepasswordRead "op://<vault>/<item>/<field>" }}
-{{ onepasswordRead "op://Berry Bolt/Telegram Bot - API key/credential" | quote }}
+{{ onepasswordRead (printf "op://%s/Telegram Bot - API key/credential" .op_vault) | quote }}
 ```
 
 ## Adding a new dotfile

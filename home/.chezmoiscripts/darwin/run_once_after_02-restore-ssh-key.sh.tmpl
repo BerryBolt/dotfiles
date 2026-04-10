@@ -7,7 +7,8 @@ set -e
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 
 SSH_DIR="$HOME/.ssh"
-SSH_KEY="$SSH_DIR/id_ed25519"
+SSH_KEY_NAME="id_ed25519"
+SSH_KEY="$SSH_DIR/$SSH_KEY_NAME"
 SSH_KEY_TMP="$SSH_KEY.tmp"
 
 # Skip if key already exists
@@ -24,7 +25,15 @@ chmod 700 "$SSH_DIR"
 
 # Fetch private key from 1Password in OpenSSH format.
 # 1Password may otherwise return a format that ssh-keygen rejects here.
-op read "op://{{ .op_vault }}/id_ed25519/private key?ssh-format=openssh" > "$SSH_KEY_TMP"
+if ! op read "op://{{ .op_vault }}/$SSH_KEY_NAME/private key?ssh-format=openssh" > "$SSH_KEY_TMP"; then
+    rm -f "$SSH_KEY_TMP"
+    echo "Error: missing required 1Password SSH key item."
+    echo "Expected vault: {{ .op_vault }}"
+    echo "Expected item title: $SSH_KEY_NAME"
+    echo "Expected item type: SSH Key"
+    echo "Expected field: private key"
+    exit 1
+fi
 chmod 600 "$SSH_KEY_TMP"
 
 # Validate the private key before moving it into place.
