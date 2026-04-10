@@ -2,13 +2,8 @@
 # CLI tools are managed by mise (see ~/.config/mise/config.toml)
 # This file is for GUI apps and system dependencies only.
 
-# System dependencies (need compilation or system libs)
-brew "ffmpeg"
-brew "whisper-cpp"
-
 # GUI apps (casks)
 cask "1password"
 cask "brave-browser"
-cask "claude"
 cask "tailscale"
 cask "antigravity"
