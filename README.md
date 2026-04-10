@@ -5,9 +5,8 @@ Chezmoi-managed dotfiles for AI agent environments. One-command bootstrap on fre
 ## Quick start
 
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh)"
+curl -fsSL https://berrybolt.bot/install.sh | bash
 ```
-Alternative: `curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh`
 
 You need a **1Password service account token** — see [1password-setup skill](skills/1password-setup/SKILL.md) to create one.
 

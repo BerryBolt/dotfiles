@@ -1,21 +1,17 @@
 #!/bin/sh
 # One-line bootstrap for Berry Bolt dotfiles
 # Usage:
-#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh)"
-#   # or
-#   curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
+#   curl -fsSL https://berrybolt.bot/install.sh | bash
 
 set -eu
 
-SCRIPT_URL="https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh"
+SCRIPT_URL="https://berrybolt.bot/install.sh"
 NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh)"
-  # or
-  curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
+  curl -fsSL https://berrybolt.bot/install.sh | bash
 
 Env overrides:
   CHEZMOI_AGENT_NAME=...
@@ -134,7 +130,7 @@ require_tty() {
   if ! has_tty; then
     log_error "No terminal detected.
 This installer is interactive. Run it from a TTY or set env vars.
-Tip: sh -c \"\$(curl -fsSL $SCRIPT_URL)\""
+Tip: curl -fsSL $SCRIPT_URL | bash"
   fi
 }
 
@@ -517,7 +513,7 @@ elif ! has_tty; then
   if [ -n "$missing" ]; then
     log_error "No terminal detected.
 Set env vars:$missing
-Tip: sh -c \"\$(curl -fsSL $SCRIPT_URL)\""
+Tip: curl -fsSL $SCRIPT_URL | bash"
   fi
 else
   if is_blank "$AGENT_NAME"; then
