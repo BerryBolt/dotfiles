@@ -6,7 +6,8 @@ set -e
 echo "Installing mise tools..."
 mise install --yes
 
-# Install Homebrew if not present (macOS)
+# Homebrew should already be installed by install.sh on macOS.
+# Keep this lookup-only fallback for manual chezmoi apply runs.
 BREW_BIN=""
 if command -v brew &> /dev/null; then
     BREW_BIN="$(command -v brew)"
@@ -17,19 +18,12 @@ elif [[ -x /usr/local/bin/brew ]]; then
 fi
 
 if [[ -z "$BREW_BIN" ]]; then
-    echo "Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    if [[ -x /opt/homebrew/bin/brew ]]; then
-        BREW_BIN="/opt/homebrew/bin/brew"
-    elif [[ -x /usr/local/bin/brew ]]; then
-        BREW_BIN="/usr/local/bin/brew"
-    fi
+    echo "Warning: Homebrew not found; skipping macOS Brewfile installs."
+    echo "         Install Homebrew separately, then re-run: chezmoi apply"
 fi
 
 if [[ -n "$BREW_BIN" ]]; then
     eval "$("$BREW_BIN" shellenv)"
-else
-    echo "Warning: Homebrew not found; skipping Brewfile installs."
 fi
 
 echo "Installing Homebrew packages..."

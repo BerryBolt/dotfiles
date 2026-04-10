@@ -7,6 +7,8 @@ set -euo pipefail
 
 SCRIPT_URL="https://berrybolt.bot/install.sh"
 NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
+OS_NAME="$(uname -s)"
+BREW_BIN=""
 
 usage() {
   cat <<'EOF'
@@ -81,6 +83,19 @@ require_cmd() {
   fi
 }
 
+find_brew() {
+  BREW_BIN=""
+  if command -v brew >/dev/null 2>&1; then
+    BREW_BIN="$(command -v brew)"
+  elif [ -x /opt/homebrew/bin/brew ]; then
+    BREW_BIN="/opt/homebrew/bin/brew"
+  elif [ -x /usr/local/bin/brew ]; then
+    BREW_BIN="/usr/local/bin/brew"
+  fi
+
+  [ -n "$BREW_BIN" ]
+}
+
 TTY_DEV=""
 
 detect_tty() {
@@ -140,6 +155,36 @@ ensure_mise_tool() {
   if ! command -v "$binary" >/dev/null 2>&1; then
     log_error "${label} not found. Install ${label} and re-run."
   fi
+}
+
+ensure_homebrew() {
+  if [ "$OS_NAME" != "Darwin" ]; then
+    return
+  fi
+
+  if find_brew; then
+    eval "$("$BREW_BIN" shellenv)"
+    return
+  fi
+
+  if [ -n "$NONINTERACTIVE" ]; then
+    log_info "Installing Homebrew in non-interactive mode..."
+    if ! NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
+      log_error "Homebrew install failed. On shared Macs, install Homebrew once with an Administrator account, then re-run."
+    fi
+  else
+    require_tty
+    log_info "Installing Homebrew..."
+    if ! /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < "$TTY_DEV"; then
+      log_error "Homebrew install failed. On shared Macs, install Homebrew once with an Administrator account, then re-run."
+    fi
+  fi
+
+  if ! find_brew; then
+    log_error "Homebrew install completed but brew was not found on PATH or in the default install locations."
+  fi
+
+  eval "$("$BREW_BIN" shellenv)"
 }
 
 PROMPT_VALUE=""
@@ -352,7 +397,7 @@ review_and_edit() {
         AGENT_NAME=$PROMPT_VALUE
         ;;
       "Edit agent email")
-        prompt_string "Agent email" "you@example.com" "$AGENT_EMAIL"
+        prompt_string "Agent email" "hi@example.bot" "$AGENT_EMAIL"
         AGENT_EMAIL=$PROMPT_VALUE
         ;;
       "Edit GitHub handle")
@@ -458,7 +503,7 @@ else
     AGENT_NAME=$PROMPT_VALUE
   fi
   if is_blank "$AGENT_EMAIL"; then
-    prompt_string "Agent email" "you@example.com" "$AGENT_EMAIL"
+    prompt_string "Agent email" "hi@example.bot" "$AGENT_EMAIL"
     AGENT_EMAIL=$PROMPT_VALUE
   fi
   if is_blank "$AGENT_HANDLE_GITHUB"; then
@@ -485,6 +530,11 @@ else
 
   review_and_edit
 fi
+
+#
+# 3. Install Homebrew on macOS if needed
+#
+ensure_homebrew
 
 export CHEZMOI_AGENT_NAME="$AGENT_NAME"
 export CHEZMOI_AGENT_EMAIL="$AGENT_EMAIL"
