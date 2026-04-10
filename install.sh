@@ -146,9 +146,9 @@ ensure_mise_tool() {
   label=${4-"$tool"}
 
   if ! command -v "$binary" >/dev/null 2>&1; then
-    log_info "Installing ${label} via mise..."
+    log_info "Installing ${label}..."
     if ! mise use -g "$spec" >/dev/null 2>&1; then
-      log_error "Failed to install ${label} via mise"
+      log_error "Failed to install ${label}"
     fi
   fi
 
@@ -557,9 +557,8 @@ cat > "$config_file" <<'EOF'
 EOF
 
 #
-# 5. Install chezmoi via mise
+# 5. Install chezmoi
 #
-log_info "Installing chezmoi..."
 ensure_mise_tool "chezmoi" "chezmoi@latest" "chezmoi" "chezmoi"
 
 #

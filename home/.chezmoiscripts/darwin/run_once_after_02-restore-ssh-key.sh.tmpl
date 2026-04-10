@@ -8,6 +8,7 @@ export PATH="$HOME/.local/share/mise/shims:$PATH"
 
 SSH_DIR="$HOME/.ssh"
 SSH_KEY="$SSH_DIR/id_ed25519"
+SSH_KEY_TMP="$SSH_KEY.tmp"
 
 # Skip if key already exists
 if [[ -f "$SSH_KEY" ]]; then
@@ -21,12 +22,19 @@ echo "Restoring SSH key from 1Password..."
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
 
-# Fetch private key from 1Password
-op item get "id_ed25519" --vault "{{ .op_vault }}" --fields "private_key" --reveal > "$SSH_KEY"
-chmod 600 "$SSH_KEY"
+# Fetch private key from 1Password in OpenSSH format.
+# 1Password may otherwise return a format that ssh-keygen rejects here.
+op read "op://{{ .op_vault }}/id_ed25519/private key?ssh-format=openssh" > "$SSH_KEY_TMP"
+chmod 600 "$SSH_KEY_TMP"
 
-# Generate public key from private
-ssh-keygen -y -f "$SSH_KEY" > "$SSH_KEY.pub"
+# Validate the private key before moving it into place.
+if ! ssh-keygen -y -f "$SSH_KEY_TMP" > "$SSH_KEY.pub"; then
+    rm -f "$SSH_KEY_TMP" "$SSH_KEY.pub"
+    echo "Error: restored SSH key is not a valid OpenSSH private key."
+    exit 1
+fi
+
+mv "$SSH_KEY_TMP" "$SSH_KEY"
 chmod 644 "$SSH_KEY.pub"
 
 echo "SSH key restored successfully."
