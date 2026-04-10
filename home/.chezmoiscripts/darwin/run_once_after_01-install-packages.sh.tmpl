@@ -1,7 +1,7 @@
 #!/bin/bash
-# Install packages: mise tools first, then Homebrew for GUI apps/system deps
+# Install packages: mise tools first, then Homebrew GUI apps/system deps.
 
-set -e
+set -euo pipefail
 
 echo "Installing mise tools..."
 mise install --yes
@@ -29,6 +29,33 @@ fi
 echo "Installing Homebrew packages..."
 BREWFILE="{{ .chezmoi.sourceDir }}/Brewfile"
 
+extract_brew_entries() {
+    local kind=$1
+    sed -nE "s/^[[:space:]]*${kind}[[:space:]]+\"([^\"]+)\".*/\\1/p" "$BREWFILE"
+}
+
+install_brew_formula() {
+    local formula=$1
+    if "$BREW_BIN" list --formula "$formula" >/dev/null 2>&1; then
+        echo "Homebrew formula already installed: $formula"
+        return
+    fi
+
+    echo "Installing Homebrew formula: $formula"
+    "$BREW_BIN" install "$formula"
+}
+
+install_brew_cask() {
+    local cask=$1
+    if "$BREW_BIN" list --cask "$cask" >/dev/null 2>&1; then
+        echo "Homebrew cask already installed: $cask"
+        return
+    fi
+
+    echo "Installing Homebrew cask: $cask"
+    "$BREW_BIN" install --cask "$cask"
+}
+
 if [[ -f "$BREWFILE" ]]; then
     if [[ -z "$BREW_BIN" ]]; then
         echo "Warning: Homebrew not available; skipping Brewfile installs."
@@ -37,11 +64,21 @@ if [[ -f "$BREWFILE" ]]; then
         if [[ ! -w "$BREW_PREFIX" && ! -w "$BREW_PREFIX/Cellar" ]]; then
             echo "Warning: Homebrew prefix $BREW_PREFIX is not writable; skipping Brewfile installs."
         else
-            if "$BREW_BIN" bundle --help 2>&1 | grep -q -- '--no-lock'; then
-                "$BREW_BIN" bundle --file="$BREWFILE" --no-lock
-            else
-                "$BREW_BIN" bundle --file="$BREWFILE"
-            fi
+            while IFS= read -r tap; do
+                [[ -n "$tap" ]] || continue
+                echo "Ensuring Homebrew tap: $tap"
+                "$BREW_BIN" tap "$tap"
+            done < <(extract_brew_entries tap)
+
+            while IFS= read -r formula; do
+                [[ -n "$formula" ]] || continue
+                install_brew_formula "$formula"
+            done < <(extract_brew_entries brew)
+
+            while IFS= read -r cask; do
+                [[ -n "$cask" ]] || continue
+                install_brew_cask "$cask"
+            done < <(extract_brew_entries cask)
         fi
     fi
 else
