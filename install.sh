@@ -145,6 +145,10 @@ is_blank() {
   esac
 }
 
+trim_space() {
+  printf "%s" "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
 ensure_mise_tool() {
   tool=$1
   spec=${2-"$tool@latest"}
@@ -190,25 +194,33 @@ prompt_string() {
   require_tty
 
   while :; do
-    log_info "$label"
     if [ -n "$current" ]; then
       echo "    Current: $current"
       echo "    Leave blank to keep."
+    elif [ -n "$placeholder" ]; then
+      echo "    Default: $placeholder"
     fi
 
     if command -v gum >/dev/null 2>&1; then
-      if [ -n "$placeholder" ]; then
-        input=$(gum input --placeholder "$placeholder" < "$TTY_DEV") || abort
+      if [ -n "$current" ]; then
+        input=$(gum input --prompt "$label: " --value "$current" --char-limit 0 --width 0 < "$TTY_DEV") || abort
+      elif [ -n "$placeholder" ]; then
+        input=$(gum input --prompt "$label: " --value "$placeholder" --char-limit 0 --width 0 < "$TTY_DEV") || abort
       else
-        input=$(gum input < "$TTY_DEV") || abort
+        input=$(gum input --prompt "$label: " --char-limit 0 --width 0 < "$TTY_DEV") || abort
       fi
     else
-      printf "    %s: " "$label"
+      printf "\033[0;34m→ %s:\033[0m " "$label"
       read -r input < "$TTY_DEV" || abort
     fi
 
-    if is_blank "$input" && [ -n "$current" ]; then
-      input=$current
+    input=$(trim_space "$input")
+    if is_blank "$input"; then
+      if [ -n "$current" ]; then
+        input=$current
+      elif [ -n "$placeholder" ]; then
+        input=$placeholder
+      fi
     fi
 
     if is_blank "$input"; then
@@ -230,15 +242,14 @@ prompt_secret() {
   require_tty
 
   while :; do
-    log_info "$label"
     if [ -n "$current" ]; then
       echo "    Token already set. Leave blank to keep."
     fi
 
     if command -v gum >/dev/null 2>&1; then
-      input=$(gum input --password --placeholder "Enter token..." < "$TTY_DEV") || abort
+      input=$(gum input --password --prompt "$label: " --char-limit 0 --width 0 < "$TTY_DEV") || abort
     else
-      printf "    Enter token: "
+      printf "\033[0;34m→ %s:\033[0m " "$label"
       stty -echo < "$TTY_DEV" 2>/dev/null || true
       read -r input < "$TTY_DEV" || abort
       stty echo < "$TTY_DEV" 2>/dev/null || true
@@ -269,8 +280,8 @@ prompt_ai_cli() {
   require_tty
 
   while :; do
-    log_info "$label"
-    echo "    Choose which AI CLI to install."
+    echo ""
+    echo "AI CLI to install"
     echo "    claude = Anthropic, codex = OpenAI, none = skip."
     if [ -n "$current" ]; then
       echo "    Current: $current"
@@ -458,13 +469,29 @@ AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
 AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
 OP_VAULT="${CHEZMOI_OP_VAULT:-}"
 OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
-if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
-  OP_SERVICE_ACCOUNT_TOKEN=""
-fi
+OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "$OP_SERVICE_ACCOUNT_TOKEN")
+case "$OP_SERVICE_ACCOUNT_TOKEN" in
+  ops_*) ;;
+  "")
+    OP_SERVICE_ACCOUNT_TOKEN=""
+    ;;
+  *)
+    log_info "1Password token looks invalid. You will be prompted."
+    OP_SERVICE_ACCOUNT_TOKEN=""
+    ;;
+esac
 
 CHEZMOI_AI_CLI="$(normalize_ai_cli "${CHEZMOI_AI_CLI:-}")"
 
 detect_tty
+if [ -n "${CHEZMOI_DEBUG:-}" ]; then
+  if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
+    log_info "debug: tty_dev=${TTY_DEV:-none} noninteractive=${NONINTERACTIVE:-0} token=$tail ai_cli=${CHEZMOI_AI_CLI:-none}"
+  else
+    log_info "debug: tty_dev=${TTY_DEV:-none} noninteractive=${NONINTERACTIVE:-0} token=missing ai_cli=${CHEZMOI_AI_CLI:-none}"
+  fi
+fi
 
 if [ -n "$NONINTERACTIVE" ]; then
   missing=""
@@ -515,7 +542,8 @@ else
     prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
     OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
   else
-    log_info "1Password token detected (you can edit in review)"
+    tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
+    log_info "1Password token detected ($tail). You can edit in review."
   fi
   if is_blank "$CHEZMOI_AI_CLI"; then
     prompt_ai_cli "$CHEZMOI_AI_CLI"
