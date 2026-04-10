@@ -30,3 +30,15 @@ ssh-keygen -y -f "$SSH_KEY" > "$SSH_KEY.pub"
 chmod 644 "$SSH_KEY.pub"
 
 echo "SSH key restored successfully."
+
+# Switch chezmoi repo to SSH remote (now that key exists)
+REPO_DIR="$HOME/.local/share/chezmoi"
+if [[ -d "$REPO_DIR/.git" ]]; then
+    current="$(git -C "$REPO_DIR" remote get-url origin 2>/dev/null || true)"
+    case "$current" in
+        https://github.com/BerryBolt/dotfiles* )
+            git -C "$REPO_DIR" remote set-url origin git@github.com:BerryBolt/dotfiles.git
+            echo "Switched chezmoi remote to SSH."
+            ;;
+    esac
+fi

@@ -6,9 +6,8 @@ Chezmoi-managed dotfiles for AI agent environments. One-command bootstrap on fre
 
 ```bash
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh)"
-# or
-curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh
 ```
+Alternative: `curl -fsSL https://raw.githubusercontent.com/BerryBolt/dotfiles/main/install.sh | sh`
 
 You need a **1Password service account token** — see [1password-setup skill](skills/1password-setup/SKILL.md) to create one.
 
@@ -28,23 +27,19 @@ After bootstrap, restart your shell (`exec $SHELL`) and use your AI CLI to run s
 ### CLI tools (via mise)
 - chezmoi, gh, starship, zoxide, fzf, jq, ripgrep
 - 1password-cli
+- tmux, cloudflared
 - Language runtimes (node, python, go, etc.) available but commented out - uncomment as needed
 
 ### GUI apps + system deps (via Homebrew, macOS only)
-- 1password, brave-browser, claude, tailscale
-- tmux, ffmpeg, whisper-cpp
-- Custom taps (see `home/Brewfile`)
+- 1password, brave-browser, claude, tailscale, antigravity
+- ffmpeg, whisper-cpp
 
 ### Restored from 1Password
 - SSH key (`~/.ssh/id_ed25519`)
 
 ## Post-bootstrap
 
-After SSH key is restored from 1Password, switch to SSH remote:
-
-```bash
-git -C ~/.local/share/chezmoi remote set-url origin git@github.com:BerryBolt/dotfiles.git
-```
+After the SSH key is restored from 1Password, the setup switches the chezmoi repo to the SSH remote automatically.
 
 Optional next steps:
 - Clone workspace: `git clone git@github.com:BerryBolt/workspace.git ~/workspace`
