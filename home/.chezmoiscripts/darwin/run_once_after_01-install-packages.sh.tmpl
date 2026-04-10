@@ -28,6 +28,11 @@ fi
 
 echo "Installing Homebrew packages..."
 BREWFILE="{{ .chezmoi.sourceDir }}/Brewfile"
+BREW_CASK_INSTALL_ARGS=(install --cask)
+
+if [[ -n "$BREW_BIN" ]] && "$BREW_BIN" install --help 2>&1 | grep -q -- '--adopt'; then
+    BREW_CASK_INSTALL_ARGS+=(--adopt)
+fi
 
 extract_brew_entries() {
     local kind=$1
@@ -53,7 +58,12 @@ install_brew_cask() {
     fi
 
     echo "Installing Homebrew cask: $cask"
-    "$BREW_BIN" install --cask "$cask"
+    if ! "$BREW_BIN" "${BREW_CASK_INSTALL_ARGS[@]}" "$cask"; then
+        echo "Error: failed to install Homebrew cask: $cask"
+        echo "If the app already exists in /Applications, either let Homebrew adopt it"
+        echo "or remove the existing app and re-run the bootstrap."
+        return 1
+    fi
 }
 
 if [[ -f "$BREWFILE" ]]; then
