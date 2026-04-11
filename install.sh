@@ -591,5 +591,5 @@ fi
 
 echo ""
 log_success "Bootstrap complete"
-echo "    Restart your shell: exec \$SHELL"
+echo '    Run: exec "$SHELL" -l'
 echo ""

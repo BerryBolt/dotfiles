@@ -34,7 +34,7 @@ The installer prompts for:
 
 ## After install
 
-- restart your shell: `exec $SHELL`
+- restart your shell: `exec "$SHELL" -l`
 - optional: clone workspace with `git clone git@github.com:BerryBolt/workspace.git ~/workspace`
 - optional: install [OpenClaw](https://openclaw.ai)
 
