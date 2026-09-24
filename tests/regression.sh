@@ -79,6 +79,7 @@ chmod 755 "$WORK/fakebin/op"
 
 ssh-keygen -q -t ed25519 -N '' -C fixture-a -f "$WORK/key-a"
 ssh-keygen -q -t ed25519 -N '' -C fixture-b -f "$WORK/key-b"
+ssh-keygen -q -t ed25519 -N '' -C fixture-c -f "$WORK/key-c"
 
 # Serve fixture key pair a|b from the fake 1Password item.
 serve_key() {
@@ -470,6 +471,36 @@ rotated_key_adopted() {
     [ "$(pub_of "$stale")" = "$(awk '{print $1, $2}' "$WORK/key-a.pub")" ]
 }
 check "rotated key replaces the old key and keeps it as .stale" rotated_key_adopted
+
+mismatched_item_leaves_key() {
+  local before stale_before
+  before=$(cat "$H/.ssh/id_ed25519")
+  stale_before=$(compgen -G "$H/.ssh/id_ed25519.stale.*" | wc -l)
+  # The item's public key says A, but its private key is C.
+  cp "$WORK/key-c" "$WORK/op/key"
+  cp "$WORK/key-a.pub" "$WORK/op/key.pub"
+  ! run_s30 &&
+    [ "$(cat "$H/.ssh/id_ed25519")" = "$before" ] &&
+    [ "$(compgen -G "$H/.ssh/id_ed25519.stale.*" | wc -l)" -eq "$stale_before" ] &&
+    [ ! -e "$H/.ssh/id_ed25519.tmp" ]
+}
+check "a mismatched 1Password key pair fails and keeps the current key" mismatched_item_leaves_key
+serve_key b
+
+missing_pub_rewritten() {
+  rm -f "$H/.ssh/id_ed25519.pub"
+  run_s30 && [ "$(awk '{print $1, $2}' "$H/.ssh/id_ed25519.pub")" = "$(awk '{print $1, $2}' "$WORK/key-b.pub")" ]
+}
+check "a missing id_ed25519.pub is rewritten on reapply" missing_pub_rewritten
+
+no_leftovers() {
+  run_s30 &&
+    [ "$(grep -c '^github.com ' "$H/.ssh/known_hosts")" -eq 3 ] &&
+    ! grep -q '^#' "$H/.ssh/known_hosts" &&
+    ! compgen -G "$H/.ssh/*.tmp*" >/dev/null &&
+    ! compgen -G "$H/.ssh/known_hosts.old" >/dev/null
+}
+check "repeated restores leave no temp files or duplicate known_hosts lines" no_leftovers
 
 only_selected_item_read() {
   # Both consumers (allowed_signers and script 30) read the selected item.

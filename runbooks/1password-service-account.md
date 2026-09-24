@@ -78,7 +78,7 @@ The SSH key is stored in the 1Password SSH Key item selected by chezmoi data `op
 What `chezmoi apply` does on step 4:
 
 - `allowed_signers` is re-rendered from `onepasswordRead` — git now trusts the new public key.
-- `run_after_30-restore-ssh-key.sh` compares the on-disk public key to 1Password's current public key. Mismatch → the on-disk key is moved to `~/.ssh/id_ed25519.stale.<timestamp>` and the new key is re-fetched.
+- `run_after_30-restore-ssh-key.sh` compares the on-disk public key to 1Password's current public key. On a mismatch it fetches the new private key to a temporary file and verifies that it matches the item's public key. Only then does it move the old key to `~/.ssh/id_ed25519.stale.<timestamp>` and install the new one. If the item's private and public keys disagree, apply stops and the current key stays in place.
 - Git commits signed from this point on use the new key and verify against the new `allowed_signers`.
 
 If 1Password is unreachable when you run apply, or the on-disk key cannot be validated, `run_after_30-restore-ssh-key.sh` exits non-zero and the apply stops. Restore 1Password connectivity or fix the local key state before retrying.

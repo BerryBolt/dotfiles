@@ -38,7 +38,7 @@ normalize_pubkey() {
 
 ensure_github_known_hosts() {
     local known_hosts=$1
-    local actual fingerprint key entry hostnames keytype material tmpfile
+    local actual fingerprint key hostnames keytype material expected tmpfile
 
     if [[ ! -r "$PINNED_KNOWN_HOSTS" ]]; then
         echo "Error: missing pinned GitHub known_hosts file: $PINNED_KNOWN_HOSTS" >&2
@@ -73,92 +73,97 @@ ensure_github_known_hosts() {
         fi
     done < "$PINNED_KNOWN_HOSTS"
 
-    mkdir -p "$SSH_DIR"
-    chmod 700 "$SSH_DIR"
     touch "$known_hosts"
     chmod 600 "$known_hosts"
 
-    tmpfile="$(mktemp)"
+    tmpfile="$(mktemp "$SSH_DIR/known_hosts.tmp.XXXXXX")"
     cp "$known_hosts" "$tmpfile"
-    if ssh-keygen -R github.com -f "$tmpfile" >/dev/null 2>&1; then
-        :
-    fi
-    cat "$PINNED_KNOWN_HOSTS" >> "$tmpfile"
+    # Drop every existing github.com entry (hashed or not); ssh-keygen -R
+    # leaves a backup next to the file, which is not wanted here.
+    ssh-keygen -R github.com -f "$tmpfile" >/dev/null 2>&1 || true
+    rm -f "$tmpfile.old"
+    grep -v '^#' "$PINNED_KNOWN_HOSTS" >> "$tmpfile"
     mv "$tmpfile" "$known_hosts"
     chmod 600 "$known_hosts"
     echo "Refreshed pinned github.com host keys in $known_hosts."
 }
 
-need_restore=0
+if ! load_op_token; then
+    echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.config/op/env is missing or empty." >&2
+    echo "       Re-run install.sh or invoke chezmoi via chezmoi-with-op." >&2
+    exit 1
+fi
+if ! op_pub=$(op read "$OP_ITEM_REF/public key" 2>/dev/null); then
+    echo "Error: failed to read SSH public key from 1Password." >&2
+    echo "       Expected: $OP_ITEM_REF/public key" >&2
+    exit 1
+fi
+op_pub_norm=$(normalize_pubkey "$op_pub")
+if [[ -z "$op_pub_norm" ]]; then
+    echo "Error: 1Password returned an invalid public key for $OP_ITEM_REF." >&2
+    exit 1
+fi
 
+mkdir -p "$SSH_DIR"
+chmod 700 "$SSH_DIR"
+
+need_restore=0
 if [[ ! -f "$SSH_KEY" ]]; then
     need_restore=1
     echo "SSH key not present; restoring from 1Password."
 else
-    if ! load_op_token; then
-        echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.config/op/env is missing or empty." >&2
-        echo "       Re-run install.sh or invoke chezmoi via chezmoi-with-op." >&2
-        exit 1
-    fi
-    if ! op_pub=$(op read "$OP_ITEM_REF/public key" 2>/dev/null); then
-        echo "Error: failed to read SSH public key from 1Password for validation." >&2
-        echo "       Expected: $OP_ITEM_REF/public key" >&2
-        exit 1
-    fi
-    local_pub=$(ssh-keygen -y -f "$SSH_KEY" 2>/dev/null || true)
-    local_pub_norm=$(normalize_pubkey "$local_pub")
-    op_pub_norm=$(normalize_pubkey "$op_pub")
-
-    if [[ -z "$op_pub_norm" ]]; then
-        echo "Error: 1Password returned an invalid public key for $OP_ITEM_REF." >&2
-        exit 1
-    fi
+    local_pub_norm=$(normalize_pubkey "$(ssh-keygen -y -P '' -f "$SSH_KEY" 2>/dev/null || true)")
     if [[ -z "$local_pub_norm" ]]; then
         echo "Error: could not derive public key from on-disk $SSH_KEY_NAME." >&2
         echo "       Delete the broken key and re-run chezmoi-with-op apply, or replace it with a valid OpenSSH key." >&2
         exit 1
     elif [[ "$local_pub_norm" != "$op_pub_norm" ]]; then
-        echo "SSH key drift detected: on-disk $SSH_KEY_NAME does not match 1Password."
-        stamp=$(date +%Y%m%d%H%M%S)
-        mv "$SSH_KEY" "$SSH_KEY.stale.$stamp"
-        [[ -f "$SSH_KEY.pub" ]] && mv "$SSH_KEY.pub" "$SSH_KEY.pub.stale.$stamp"
-        echo "Stale key moved aside: $SSH_KEY.stale.$stamp"
         need_restore=1
+        echo "SSH key drift detected: on-disk $SSH_KEY_NAME does not match 1Password."
     else
         echo "SSH key matches 1Password."
+        if [[ "$(normalize_pubkey "$(cat "$SSH_KEY.pub" 2>/dev/null || true)")" != "$op_pub_norm" ]]; then
+            printf '%s\n' "$op_pub_norm" > "$SSH_KEY.pub"
+            chmod 644 "$SSH_KEY.pub"
+            echo "Rewrote $SSH_KEY.pub from the private key."
+        fi
     fi
 fi
 
 if [[ "$need_restore" -eq 1 ]]; then
     trap 'rm -f "$SSH_KEY_TMP"' EXIT
+    rm -f "$SSH_KEY_TMP"
 
-    if ! load_op_token; then
-        echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.config/op/env is missing or empty." >&2
-        echo "       Re-run install.sh or restore ~/.config/op/env manually." >&2
-        exit 1
-    fi
-
-    mkdir -p "$SSH_DIR"
-    chmod 700 "$SSH_DIR"
-
+    # Fetch and verify the replacement before touching the current key.
     # Force OpenSSH format; 1Password may otherwise return a format ssh-keygen rejects.
-    if ! op read "$OP_ITEM_REF/private key?ssh-format=openssh" > "$SSH_KEY_TMP"; then
-        rm -f "$SSH_KEY_TMP"
+    if ! (umask 077 && op read "$OP_ITEM_REF/private key?ssh-format=openssh" > "$SSH_KEY_TMP"); then
         echo "Error: missing required 1Password SSH key item." >&2
         echo "       Expected: $OP_ITEM_REF (SSH Key, field 'private key')" >&2
         exit 1
     fi
     chmod 600 "$SSH_KEY_TMP"
-
-    if ! ssh-keygen -y -f "$SSH_KEY_TMP" > "$SSH_KEY.pub"; then
-        rm -f "$SSH_KEY_TMP" "$SSH_KEY.pub"
-        echo "Error: restored SSH key is not a valid OpenSSH private key." >&2
+    new_pub_norm=$(normalize_pubkey "$(ssh-keygen -y -P '' -f "$SSH_KEY_TMP" 2>/dev/null || true)")
+    if [[ -z "$new_pub_norm" ]]; then
+        echo "Error: the 1Password private key is not a valid unencrypted OpenSSH key. Existing key left in place." >&2
+        exit 1
+    fi
+    if [[ "$new_pub_norm" != "$op_pub_norm" ]]; then
+        echo "Error: the 1Password private and public keys of $OP_ITEM_REF do not match. Existing key left in place." >&2
         exit 1
     fi
 
+    # Replacement verified: keep the previous key, then install the new one.
+    if [[ -f "$SSH_KEY" ]]; then
+        stamp=$(date +%Y%m%d%H%M%S)
+        mv "$SSH_KEY" "$SSH_KEY.stale.$stamp"
+        if [[ -f "$SSH_KEY.pub" ]]; then
+            mv "$SSH_KEY.pub" "$SSH_KEY.pub.stale.$stamp"
+        fi
+        echo "Previous key kept as $SSH_KEY.stale.$stamp"
+    fi
     mv "$SSH_KEY_TMP" "$SSH_KEY"
+    printf '%s\n' "$new_pub_norm" > "$SSH_KEY.pub"
     chmod 644 "$SSH_KEY.pub"
-
     trap - EXIT
     echo "SSH key restored successfully."
 fi
