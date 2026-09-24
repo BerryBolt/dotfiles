@@ -24,17 +24,17 @@ This step requires human action in the 1Password web console:
 4. Select vault access (grant access to the agent's vault)
 5. Copy the service account token (shown once)
 
-**Important:** The token is shown only once. Store it securely.
+**Important:** The token is shown only once. Store it in a vault the service account itself has NO access to (typically your personal vault) — not in the agent's own vault. See [policies/credentials.md § Vault rules](../../policies/credentials.md#vault-rules) for the rationale.
 
 ### 2. Store Token
 
-The token should be provided during `chezmoi init` and stored in:
-- `~/.config/chezmoi/chezmoi.toml` (for chezmoi templates)
+Provide the token to `install.sh` when prompted (see repo [README.md](../../README.md)). `install.sh` exports it into chezmoi's process env, and chezmoi renders it into `~/.config/op/env` (mode 0600). That file is the single source of truth for all OP_* env vars at rest. The token is NOT persisted in chezmoi data.
 
 ### 3. Validate Access
 
+After bootstrap, open a new Omarchy terminal. The `op` shell function loads `~/.config/op/env` into the command's process on each call, so you just run `op` directly (from scripts, use `with-op op ...`):
+
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN="<token>"
 op whoami
 op vault list
 ```
@@ -44,10 +44,10 @@ Expected output shows the service account name and accessible vaults.
 ### 4. Test Read Access
 
 ```bash
-op item list --vault="$OP_VAULT"
+op item list
 ```
 
-Should list items in the vault.
+Should list items in the default vault. The wrapper subshell has `OP_VAULT` set, so no `--vault` flag is needed.
 
 ## Troubleshooting
 
@@ -64,8 +64,8 @@ If token is compromised:
 1. Go to 1Password web console → Service Accounts
 2. Revoke old token
 3. Create new token
-4. Update `~/.config/chezmoi/chezmoi.toml`
-5. Run `chezmoi apply` to update dependent files
+4. Re-run `install.sh` and supply the new token at the prompt — it will re-render `~/.config/op/env`
+5. `op whoami` to verify
 
 ## References
 

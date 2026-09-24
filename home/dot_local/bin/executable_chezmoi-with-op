@@ -1,0 +1,29 @@
+#!/bin/bash
+# Invoke chezmoi with the 1Password service-account token loaded for
+# template rendering, without exporting it to the parent shell.
+# See policies/chezmoi.md "Token-aware invocations".
+
+set -eu
+
+# Prepend known install locations so stripped-PATH callers (git hooks,
+# IDE task runners, cron) can still resolve chezmoi and its subprocesses.
+export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
+
+ENV_FILE="$HOME/.config/op/env"
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo "error: $ENV_FILE not found. Re-run install.sh or chezmoi apply." >&2
+    exit 1
+fi
+
+if ! command -v chezmoi >/dev/null 2>&1; then
+    echo "error: chezmoi not found. Expected at ~/.local/share/mise/shims/chezmoi. Re-run install.sh." >&2
+    exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+
+exec chezmoi "$@"

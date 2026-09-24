@@ -1,9 +1,0 @@
-# Brewfile - macOS only
-# CLI tools are managed by mise (see ~/.config/mise/config.toml)
-# This file is for GUI apps and system dependencies only.
-
-# GUI apps (casks)
-cask "1password"
-cask "brave-browser"
-cask "tailscale"
-cask "antigravity"

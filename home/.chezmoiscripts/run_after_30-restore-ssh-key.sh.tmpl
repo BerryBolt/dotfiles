@@ -1,0 +1,183 @@
+#!/bin/bash
+# Ensure ~/.ssh/id_ed25519 matches the 1Password item and that the
+# chezmoi source remote uses SSH. Drift detection is load-bearing:
+# allowed_signers follows 1Password on every render, so a stale on-disk
+# key would make git sign with one key and verify with another.
+
+set -euo pipefail
+
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
+SSH_DIR="$HOME/.ssh"
+SSH_KEY_NAME="id_ed25519"
+SSH_KEY="$SSH_DIR/$SSH_KEY_NAME"
+SSH_KEY_TMP="$SSH_KEY.tmp"
+REPO_DIR="$HOME/.local/share/chezmoi"
+PINNED_KNOWN_HOSTS="$HOME/.local/share/ssh-bootstrap/github_known_hosts"
+PINNED_FINGERPRINTS="$HOME/.local/share/ssh-bootstrap/github_known_hosts.sha256"
+
+load_op_token() {
+    if [[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]]; then
+        return 0
+    fi
+    if [[ ! -f "$HOME/.config/op/env" ]]; then
+        return 1
+    fi
+    set -a
+    # shellcheck disable=SC1091
+    source "$HOME/.config/op/env" || { set +a; return 1; }
+    set +a
+    [[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]]
+}
+
+# Strip trailing comment so "<type> <base64>" is what we compare.
+normalize_pubkey() {
+    awk 'NF>=2 {print $1, $2; exit}' <<<"$1"
+}
+
+ensure_github_known_hosts() {
+    local known_hosts=$1
+    local actual fingerprint key entry hostnames keytype material tmpfile
+
+    if [[ ! -r "$PINNED_KNOWN_HOSTS" ]]; then
+        echo "Error: missing pinned GitHub known_hosts file: $PINNED_KNOWN_HOSTS" >&2
+        exit 1
+    fi
+    if [[ ! -r "$PINNED_FINGERPRINTS" ]]; then
+        echo "Error: missing pinned GitHub fingerprint file: $PINNED_FINGERPRINTS" >&2
+        exit 1
+    fi
+
+    while IFS= read -r actual; do
+        [[ -n "$actual" ]] || continue
+        [[ "$actual" =~ ^# ]] && continue
+        read -r hostnames keytype material <<<"$actual"
+        if [[ -z "${hostnames:-}" || -z "${keytype:-}" || -z "${material:-}" ]]; then
+            echo "Error: invalid pinned GitHub known_hosts entry: $actual" >&2
+            exit 1
+        fi
+
+        key="$(printf '%s %s\n' "$keytype" "$material")"
+        fingerprint="$(ssh-keygen -lf /dev/stdin -E sha256 <<<"$key" 2>/dev/null | awk '{print $2}')"
+        expected="$(awk -v keytype="$keytype" '$2 == keytype {print $1; exit}' "$PINNED_FINGERPRINTS")"
+        if [[ -z "$expected" ]]; then
+            echo "Error: missing expected fingerprint for $keytype in $PINNED_FINGERPRINTS" >&2
+            exit 1
+        fi
+        if [[ "$fingerprint" != "$expected" ]]; then
+            echo "Error: pinned GitHub key fingerprint mismatch for $keytype" >&2
+            echo "       expected: $expected" >&2
+            echo "       actual:   ${fingerprint:-<unreadable>}" >&2
+            exit 1
+        fi
+    done < "$PINNED_KNOWN_HOSTS"
+
+    mkdir -p "$SSH_DIR"
+    chmod 700 "$SSH_DIR"
+    touch "$known_hosts"
+    chmod 600 "$known_hosts"
+
+    tmpfile="$(mktemp)"
+    cp "$known_hosts" "$tmpfile"
+    if ssh-keygen -R github.com -f "$tmpfile" >/dev/null 2>&1; then
+        :
+    fi
+    cat "$PINNED_KNOWN_HOSTS" >> "$tmpfile"
+    mv "$tmpfile" "$known_hosts"
+    chmod 600 "$known_hosts"
+    echo "Refreshed pinned github.com host keys in $known_hosts."
+}
+
+need_restore=0
+
+if [[ ! -f "$SSH_KEY" ]]; then
+    need_restore=1
+    echo "SSH key not present; restoring from 1Password."
+else
+    if ! load_op_token; then
+        echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.config/op/env is missing or empty." >&2
+        echo "       Re-run install.sh or invoke chezmoi via chezmoi-with-op." >&2
+        exit 1
+    fi
+    if ! op_pub=$(op read "op://{{ .op_vault }}/$SSH_KEY_NAME/public key" 2>/dev/null); then
+        echo "Error: failed to read SSH public key from 1Password for validation." >&2
+        echo "       Expected: op://{{ .op_vault }}/$SSH_KEY_NAME/public key" >&2
+        exit 1
+    fi
+    local_pub=$(ssh-keygen -y -f "$SSH_KEY" 2>/dev/null || true)
+    local_pub_norm=$(normalize_pubkey "$local_pub")
+    op_pub_norm=$(normalize_pubkey "$op_pub")
+
+    if [[ -z "$op_pub_norm" ]]; then
+        echo "Error: 1Password returned an invalid public key for $SSH_KEY_NAME." >&2
+        exit 1
+    fi
+    if [[ -z "$local_pub_norm" ]]; then
+        echo "Error: could not derive public key from on-disk $SSH_KEY_NAME." >&2
+        echo "       Delete the broken key and re-run chezmoi-with-op apply, or replace it with a valid OpenSSH key." >&2
+        exit 1
+    elif [[ "$local_pub_norm" != "$op_pub_norm" ]]; then
+        echo "SSH key drift detected: on-disk $SSH_KEY_NAME does not match 1Password."
+        stamp=$(date +%Y%m%d%H%M%S)
+        mv "$SSH_KEY" "$SSH_KEY.stale.$stamp"
+        [[ -f "$SSH_KEY.pub" ]] && mv "$SSH_KEY.pub" "$SSH_KEY.pub.stale.$stamp"
+        echo "Stale key moved aside: $SSH_KEY.stale.$stamp"
+        need_restore=1
+    else
+        echo "SSH key matches 1Password."
+    fi
+fi
+
+if [[ "$need_restore" -eq 1 ]]; then
+    trap 'rm -f "$SSH_KEY_TMP"' EXIT
+
+    if ! load_op_token; then
+        echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.config/op/env is missing or empty." >&2
+        echo "       Re-run install.sh or restore ~/.config/op/env manually." >&2
+        exit 1
+    fi
+
+    mkdir -p "$SSH_DIR"
+    chmod 700 "$SSH_DIR"
+
+    # Force OpenSSH format; 1Password may otherwise return a format ssh-keygen rejects.
+    if ! op read "op://{{ .op_vault }}/$SSH_KEY_NAME/private key?ssh-format=openssh" > "$SSH_KEY_TMP"; then
+        rm -f "$SSH_KEY_TMP"
+        echo "Error: missing required 1Password SSH key item." >&2
+        echo "       Expected: op://{{ .op_vault }}/$SSH_KEY_NAME (SSH Key, field 'private key')" >&2
+        exit 1
+    fi
+    chmod 600 "$SSH_KEY_TMP"
+
+    if ! ssh-keygen -y -f "$SSH_KEY_TMP" > "$SSH_KEY.pub"; then
+        rm -f "$SSH_KEY_TMP" "$SSH_KEY.pub"
+        echo "Error: restored SSH key is not a valid OpenSSH private key." >&2
+        exit 1
+    fi
+
+    mv "$SSH_KEY_TMP" "$SSH_KEY"
+    chmod 644 "$SSH_KEY.pub"
+
+    trap - EXIT
+    echo "SSH key restored successfully."
+fi
+
+# Ensure github.com uses a pinned, repo-managed known_hosts block so later
+# SSH operations (source sync after the remote switch below, user Git work)
+# don't trip over strict host key checking on a fresh machine or trust a
+# live ssh-keyscan response.
+KNOWN_HOSTS="$SSH_DIR/known_hosts"
+ensure_github_known_hosts "$KNOWN_HOSTS"
+
+# The initial source checkout may use HTTPS before the SSH key exists. Once the
+# key is restored, normalize the persisted source remote to SSH.
+if [[ -d "$REPO_DIR/.git" ]]; then
+    current="$(git -C "$REPO_DIR" remote get-url origin 2>/dev/null || true)"
+    case "$current" in
+        https://github.com/*)
+            new_remote=$(printf '%s' "$current" | sed -E 's|^https://github\.com/|git@github.com:|')
+            git -C "$REPO_DIR" remote set-url origin "$new_remote"
+            echo "Switched chezmoi remote to SSH: $new_remote"
+            ;;
+    esac
+fi

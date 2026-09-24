@@ -1,0 +1,351 @@
+#!/bin/bash
+# shellcheck disable=SC2088  # check descriptions name target paths literally
+# Focused regression checks that need no real credentials or target machine.
+#
+# Every case runs under a throwaway HOME with a clean environment (env -i)
+# and a fake `op` that serves generated fixture keys. The real HOME, the
+# operator's 1Password session, and GitHub are never touched.
+#
+# Usage: tests/regression.sh [source-dir]   (default: this checkout)
+# Requires: bash, git, ssh-keygen, chezmoi, awk.
+
+set -euo pipefail
+
+SRC="$(cd "${1:-$(dirname "${BASH_SOURCE[0]}")/..}" && pwd)"
+TMP_ROOT="${TMPDIR:-/tmp}"
+WORK="$(mktemp -d "${TMP_ROOT%/}/dotfiles-regression.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+
+CHEZMOI_BIN="$(command -v chezmoi)" || { echo "chezmoi is required on PATH" >&2; exit 1; }
+BASE_PATH="$WORK/fakebin:$(dirname "$CHEZMOI_BIN"):/usr/bin:/bin:/usr/sbin:/sbin"
+
+pass=0
+fail=0
+
+check() {
+  local desc=$1
+  shift
+  if "$@" >>"$WORK/log" 2>&1; then
+    printf '  \033[0;32m✓\033[0m %s\n' "$desc"
+    pass=$((pass + 1))
+  else
+    printf '  \033[0;31m✗\033[0m %s\n' "$desc" >&2
+    fail=$((fail + 1))
+  fi
+}
+
+perm_of() {
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
+}
+
+pub_of() {
+  ssh-keygen -y -P '' -f "$1" | awk '{print $1, $2}'
+}
+
+# --- Fixtures -----------------------------------------------------------------
+
+VAULT="Fixture Vault"
+ITEM="id_ed25519"
+EMAIL="agent@example.com"
+
+mkdir -p "$WORK/fakebin" "$WORK/op"
+cat >"$WORK/fakebin/op" <<'EOF'
+#!/bin/bash
+# Fake 1Password CLI: serves the fixture key pair in $FAKE_OP_DIR.
+set -eu
+for arg in "$@"; do
+  [ "$arg" = --version ] && { echo 2.32.0; exit 0; }
+done
+[ "${1:-}" = read ] || { echo "fake op: unsupported: $*" >&2; exit 1; }
+[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ] || { echo "fake op: no token" >&2; exit 1; }
+uri=""
+for arg in "$@"; do
+  case $arg in op://*) uri=$arg ;; esac
+done
+echo "$uri" >>"$FAKE_OP_DIR/requests"
+case $uri in
+  "op://$FAKE_OP_VAULT/$FAKE_OP_ITEM/public key") cat "$FAKE_OP_DIR/key.pub" ;;
+  "op://$FAKE_OP_VAULT/$FAKE_OP_ITEM/private key?ssh-format=openssh") cat "$FAKE_OP_DIR/key" ;;
+  *) echo "[ERROR] fake op: item not found: $uri" >&2; exit 1 ;;
+esac
+EOF
+chmod 755 "$WORK/fakebin/op"
+
+ssh-keygen -q -t ed25519 -N '' -C fixture-a -f "$WORK/key-a"
+ssh-keygen -q -t ed25519 -N '' -C fixture-b -f "$WORK/key-b"
+
+# Serve fixture key pair a|b from the fake 1Password item.
+serve_key() {
+  cp "$WORK/key-$1" "$WORK/op/key"
+  cp "$WORK/key-$1.pub" "$WORK/op/key.pub"
+}
+
+OMARCHY_BASHRC='# Omarchy environment (OMARCHY_PATH + PATH), needed even for non-interactive shells
+[[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] && source /usr/share/omarchy/default/bash/env-bootstrap
+
+# If not running interactively, don'"'"'t do anything else (leave this above the rc source)
+[[ $- != *i* ]] && return
+
+source "$OMARCHY_PATH/default/bash/rc"
+
+# Add your own exports, aliases, and functions here.
+alias p='"'"'python'"'"'
+'
+USER_MISE='[tools]
+node = "lts"
+'
+
+# Build a fake Omarchy home with the candidate source checked out at the
+# default location behind a GitHub HTTPS origin, as a fresh clone leaves it.
+new_home() {
+  local h
+  h=$(mktemp -d "$WORK/home.XXXXXX")
+  chmod 700 "$h"
+  mkdir -p "$h/.config/mise" "$h/.local/share"
+  chmod 755 "$h/.config"
+  printf '%s' "$OMARCHY_BASHRC" >"$h/.bashrc"
+  printf '%s' "$USER_MISE" >"$h/.config/mise/config.toml"
+  mkdir "$h/.local/share/chezmoi"
+  (cd "$SRC" && tar cf - --exclude .git --exclude .local --exclude PLAN.md --exclude .env --exclude tests/.env.local .) |
+    (cd "$h/.local/share/chezmoi" && tar xf -)
+  git -C "$h/.local/share/chezmoi" init -q
+  git -C "$h/.local/share/chezmoi" add -A
+  git -C "$h/.local/share/chezmoi" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qm fixture
+  git -C "$h/.local/share/chezmoi" remote add origin https://github.com/example/dotfiles.git
+  printf '%s' "$h"
+}
+
+# Run a command inside fixture home $1 with a clean environment.
+in_home() {
+  local h=$1
+  shift
+  env -i HOME="$h" PATH="$BASE_PATH" TERM=dumb LANG=C \
+    FAKE_OP_DIR="$WORK/op" FAKE_OP_VAULT="$VAULT" FAKE_OP_ITEM="$ITEM" "$@"
+}
+
+INIT_ENV="CHEZMOI_AGENT_NAME=Fixture Agent"
+init_apply() {
+  local h=$1
+  in_home "$h" env "$INIT_ENV" CHEZMOI_AGENT_EMAIL="$EMAIL" CHEZMOI_AGENT_HANDLE_GITHUB=example \
+    CHEZMOI_OP_VAULT="$VAULT" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one \
+    chezmoi init --apply --no-tty --exclude=scripts </dev/null
+}
+
+render_script() {
+  local h=$1 name=$2
+  in_home "$h" chezmoi execute-template --no-tty \
+    <"$SRC/home/.chezmoiscripts/$name" >"$h/$name.sh"
+}
+
+# --- Installer ----------------------------------------------------------------
+
+echo "Installer"
+
+installer_tools_match_manifest() {
+  local installer manifest script
+  installer=$(bash -c '. "$1"; printf "%s\n" "${BOOTSTRAP_TOOLS[@]%@*}"' _ "$SRC/install.sh" | sort)
+  manifest=$(awk '/^\[tools\]/{t=1;next} /^\[/{t=0} t && /=/{print $1}' \
+    "$SRC/home/dot_config/mise/conf.d/dotfiles.toml" | sort)
+  script=$(sed -n 's/^mise install --yes //p' \
+    "$SRC/home/.chezmoiscripts/run_once_after_10-install-mise-tools.sh.tmpl" | tr ' ' '\n' | sort)
+  [ -n "$manifest" ] && [ "$installer" = "$manifest" ] && [ "$script" = "$manifest" ]
+}
+check "installer and apply script install exactly the mise manifest tools" installer_tools_match_manifest
+
+noninteractive_requires_inputs() {
+  local out
+  if out=$(env -i HOME="$WORK" PATH="$BASE_PATH" CHEZMOI_NONINTERACTIVE=1 \
+    bash -c '. "$1"; collect_inputs' _ "$SRC/install.sh" 2>&1); then
+    return 1
+  fi
+  case $out in
+    *"CHEZMOI_AGENT_NAME CHEZMOI_AGENT_EMAIL CHEZMOI_AGENT_HANDLE_GITHUB CHEZMOI_OP_VAULT OP_SERVICE_ACCOUNT_TOKEN"*) ;;
+    *) return 1 ;;
+  esac
+}
+check "non-interactive install names every missing input" noninteractive_requires_inputs
+
+preflight_matches_host() {
+  local id="" out rc
+  [ -r /etc/os-release ] && id=$(. /etc/os-release && printf '%s' "${ID:-}")
+  mkdir -p "$WORK/preflight-home"
+  touch "$WORK/preflight-home/.bashrc"
+  out=$(env -i HOME="$WORK/preflight-home" PATH="$BASE_PATH" \
+    bash -c '. "$1"; preflight' _ "$SRC/install.sh" 2>&1) && rc=0 || rc=$?
+  if [ "$id" = omarchy ]; then
+    [ "$rc" -eq 0 ]
+  else
+    [ "$rc" -ne 0 ] && case $out in *"Omarchy only"*) true ;; *) false ;; esac
+  fi
+}
+check "preflight rejects hosts other than Omarchy" preflight_matches_host
+
+# --- Unattended init ------------------------------------------------------------
+
+echo "Unattended init"
+
+H=$(new_home)
+serve_key a
+
+config_renders_without_prompt() {
+  local out
+  out=$(in_home "$H" env "$INIT_ENV" CHEZMOI_AGENT_EMAIL="$EMAIL" CHEZMOI_AGENT_HANDLE_GITHUB=example \
+    CHEZMOI_OP_VAULT="$VAULT" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one \
+    chezmoi execute-template --init --no-tty --stdinisatty=false \
+    --file "$SRC/home/.chezmoi.toml.tmpl" </dev/null 2>&1) || return 1
+  case $out in *"op_vault = \"$VAULT\""*) ;; *) return 1 ;; esac
+  case $out in *ai_cli* | *agent_workspace_repo* | *ops_fixture*) return 1 ;; esac
+}
+check "config template renders from env inputs with no prompt or token" config_renders_without_prompt
+
+config_requires_token() {
+  ! in_home "$H" env "$INIT_ENV" CHEZMOI_AGENT_EMAIL="$EMAIL" CHEZMOI_AGENT_HANDLE_GITHUB=example \
+    CHEZMOI_OP_VAULT="$VAULT" chezmoi execute-template --init --no-tty --stdinisatty=false \
+    --file "$SRC/home/.chezmoi.toml.tmpl" </dev/null
+}
+check "config template fails without OP_SERVICE_ACCOUNT_TOKEN" config_requires_token
+
+check "fresh chezmoi init --apply succeeds unattended" init_apply "$H"
+
+# --- Applied files ----------------------------------------------------------------
+
+echo "Applied files"
+
+bashrc_preserved() {
+  local b="$H/.bashrc"
+  head -c "${#OMARCHY_BASHRC}" "$b" | cmp -s - <(printf '%s' "$OMARCHY_BASHRC") &&
+    [ "$(grep -c '^# >>> dotfiles >>>$' "$b")" -eq 1 ] &&
+    grep -qxF 'op() { with-op op "$@"; }' "$b"
+}
+check "~/.bashrc keeps Omarchy content and gains one dotfiles block" bashrc_preserved
+
+check "user mise config.toml is untouched" \
+  cmp -s "$H/.config/mise/config.toml" <(printf '%s' "$USER_MISE")
+check "dotfiles mise manifest lands in conf.d" test -f "$H/.config/mise/conf.d/dotfiles.toml"
+check "~/.config keeps its mode (755)" test "$(perm_of "$H/.config")" = 755
+check "~/.config/op is 700" test "$(perm_of "$H/.config/op")" = 700
+check "~/.config/op/env is 600" test "$(perm_of "$H/.config/op/env")" = 600
+check "~/.config/op/env holds the supplied token" grep -qxF 'OP_SERVICE_ACCOUNT_TOKEN="ops_fixture_one"' "$H/.config/op/env"
+check "chezmoi config does not persist the token" bash -c '! grep -q ops_ "$1"' _ "$H/.config/chezmoi/chezmoi.toml"
+check "allowed_signers trusts the 1Password public key" \
+  grep -qxF "$EMAIL $(awk '{print $1, $2}' "$WORK/key-a.pub")" <(awk '{print $1, $2, $3}' "$H/.config/git/allowed_signers")
+check "gitconfig signs with the restored key" grep -qF "signingkey = $H/.ssh/id_ed25519" "$H/.gitconfig"
+check "gitconfig has no gh credential helper" bash -c '! grep -q "gh auth" "$1"' _ "$H/.gitconfig"
+check "with-op and chezmoi-with-op are executable" \
+  test -x "$H/.local/bin/with-op" -a -x "$H/.local/bin/chezmoi-with-op"
+
+reapply_is_clean() {
+  in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one chezmoi verify --no-tty --exclude=scripts </dev/null &&
+    in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one chezmoi apply --no-tty --exclude=scripts </dev/null &&
+    in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one chezmoi verify --no-tty --exclude=scripts </dev/null &&
+    [ "$(grep -c '^# >>> dotfiles >>>$' "$H/.bashrc")" -eq 1 ]
+}
+check "reapply leaves no managed-file drift" reapply_is_clean
+
+# --- Bash integration -----------------------------------------------------------
+
+echo "Bash integration"
+
+op_function_scopes_token() {
+  local out shims="$H/.local/share/mise/shims"
+  # Stand in for the mise op shim that with-op resolves first.
+  mkdir -p "$shims"
+  printf '#!/bin/bash\necho "child=${OP_SERVICE_ACCOUNT_TOKEN:-} vault=${OP_VAULT:-}"\n' >"$shims/op"
+  chmod 755 "$shims/op"
+  # Source only the dotfiles block; Omarchy files are absent on this host.
+  out=$(in_home "$H" bash -c '
+    eval "$(sed -n "/^# >>> dotfiles >>>$/,/^# <<< dotfiles <<<$/p" "$HOME/.bashrc")"
+    PATH="$HOME/.local/bin:$PATH"
+    op
+    echo "parent=${OP_SERVICE_ACCOUNT_TOKEN:-}"
+  ')
+  rm -f "$shims/op"
+  [ "$out" = "child=ops_fixture_one vault=$VAULT
+parent=" ]
+}
+check "op() loads the token only into the wrapped command" op_function_scopes_token
+
+with_op_requires_env_file() {
+  local h out
+  h=$(new_home)
+  mkdir -p "$h/.local/bin"
+  cp "$SRC/home/dot_local/bin/executable_with-op" "$h/.local/bin/with-op"
+  chmod 755 "$h/.local/bin/with-op"
+  ! out=$(in_home "$h" "$h/.local/bin/with-op" true 2>&1) &&
+    case $out in *"config/op/env not found"*) true ;; *) false ;; esac
+}
+check "with-op fails clearly without ~/.config/op/env" with_op_requires_env_file
+
+# --- SSH restoration ----------------------------------------------------------------
+
+echo "SSH restoration"
+
+render_script "$H" run_after_30-restore-ssh-key.sh.tmpl
+S30="$H/run_after_30-restore-ssh-key.sh.tmpl.sh"
+run_s30() {
+  in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one bash "$S30"
+}
+
+check "restore script renders and parses" bash -n "$S30"
+
+# Seed an unrelated host and a stale github.com entry (fixture keys).
+mkdir -p "$H/.ssh"
+{
+  printf 'example.org %s\n' "$(awk '{print $1, $2}' "$WORK/key-a.pub")"
+  printf 'github.com %s\n' "$(awk '{print $1, $2}' "$WORK/key-b.pub")"
+} >"$H/.ssh/known_hosts"
+STALE_GITHUB_KEY=$(awk '{print $2}' "$WORK/key-b.pub")
+
+missing_key_restored() {
+  run_s30 &&
+    [ "$(pub_of "$H/.ssh/id_ed25519")" = "$(awk '{print $1, $2}' "$WORK/key-a.pub")" ] &&
+    [ "$(perm_of "$H/.ssh/id_ed25519")" = 600 ] &&
+    [ "$(perm_of "$H/.ssh")" = 700 ] &&
+    [ -f "$H/.ssh/id_ed25519.pub" ]
+}
+check "missing SSH key is restored from 1Password" missing_key_restored
+
+known_hosts_pinned() {
+  local kh="$H/.ssh/known_hosts"
+  grep -q '^example.org ' "$kh" &&
+    ! grep -qF "$STALE_GITHUB_KEY" "$kh" &&
+    [ "$(grep -c '^github.com ' "$kh")" -eq 3 ] &&
+    cmp -s <(grep '^github.com ' "$kh") <(grep '^github.com ' "$SRC/home/dot_local/share/ssh-bootstrap/github_known_hosts")
+}
+check "known_hosts pins GitHub keys and keeps other hosts" known_hosts_pinned
+
+check "source remote switches from HTTPS to SSH" \
+  test "$(git -C "$H/.local/share/chezmoi" remote get-url origin)" = git@github.com:example/dotfiles.git
+
+matching_key_kept() {
+  local before
+  before=$(cat "$H/.ssh/id_ed25519")
+  run_s30 && [ "$(cat "$H/.ssh/id_ed25519")" = "$before" ] &&
+    ! compgen -G "$H/.ssh/id_ed25519*.stale.*" >/dev/null
+}
+check "matching key is left in place on reapply" matching_key_kept
+
+rotated_key_adopted() {
+  serve_key b
+  run_s30 &&
+    [ "$(pub_of "$H/.ssh/id_ed25519")" = "$(awk '{print $1, $2}' "$WORK/key-b.pub")" ] &&
+    stale=$(compgen -G "$H/.ssh/id_ed25519.stale.*" | head -1) &&
+    [ "$(pub_of "$stale")" = "$(awk '{print $1, $2}' "$WORK/key-a.pub")" ]
+}
+check "rotated key replaces the old key and keeps it as .stale" rotated_key_adopted
+
+restore_requires_token() {
+  local out
+  ! out=$(in_home "$H" bash "$S30" 2>&1) &&
+    case $out in *OP_SERVICE_ACCOUNT_TOKEN*) true ;; *) false ;; esac
+}
+mv "$H/.config/op/env" "$WORK/env.saved"
+check "restore fails clearly without a token or env file" restore_requires_token
+mv "$WORK/env.saved" "$H/.config/op/env"
+
+echo ""
+printf '%d passed, %d failed\n' "$pass" "$fail"
+if [ "$fail" -ne 0 ]; then
+  echo "Details: rerun with the log kept, or inspect failing cases above." >&2
+  exit 1
+fi

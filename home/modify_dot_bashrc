@@ -1,0 +1,46 @@
+#!/bin/bash
+# chezmoi modify script for ~/.bashrc: keep Omarchy's file and maintain one
+# marked block with the dotfiles shell integration. chezmoi passes the
+# current file on stdin and writes stdout back.
+
+set -euo pipefail
+
+begin='# >>> dotfiles >>>'
+end='# <<< dotfiles <<<'
+
+block=$(cat <<'BLOCK'
+# >>> dotfiles >>>
+# Managed by the dotfiles chezmoi source; edit it there, not here.
+# `op` loads ~/.config/op/env into a subshell per call (see with-op).
+op() { with-op op "$@"; }
+# <<< dotfiles <<<
+BLOCK
+)
+
+# Preserve the input byte-for-byte, including trailing newlines.
+current=$(cat; printf x)
+current=${current%x}
+
+if [[ -z "$current" ]]; then
+    echo "error: ~/.bashrc is missing or empty. Restore Omarchy's default (/etc/skel/.bashrc) and re-apply." >&2
+    exit 1
+fi
+
+begins=$(grep -cxF -- "$begin" <<<"$current" || true)
+ends=$(grep -cxF -- "$end" <<<"$current" || true)
+
+if [[ "$begins" -eq 0 && "$ends" -eq 0 ]]; then
+    printf '%s' "$current"
+    [[ "$current" == *$'\n' ]] || printf '\n'
+    printf '\n%s\n' "$block"
+elif [[ "$begins" -eq 1 && "$ends" -eq 1 ]]; then
+    # Replace the existing block in place so surrounding user edits stay put.
+    printf '%s' "$current" | BLOCK="$block" awk -v b="$begin" -v e="$end" '
+        $0 == b { print ENVIRON["BLOCK"]; skip = 1; next }
+        skip && $0 == e { skip = 0; next }
+        !skip { print }
+    '
+else
+    echo "error: ~/.bashrc has an incomplete or repeated dotfiles block ($begin / $end). Fix it by hand and re-apply." >&2
+    exit 1
+fi

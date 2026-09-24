@@ -2,22 +2,16 @@
 {{- $agent_email := or (env "CHEZMOI_AGENT_EMAIL") (promptStringOnce . "agent_email" "Agent email") -}}
 {{- $agent_handle_github := or (env "CHEZMOI_AGENT_HANDLE_GITHUB") (promptStringOnce . "agent_handle_github" "GitHub handle (e.g., BerryBolt)") -}}
 {{- $op_vault := or (env "CHEZMOI_OP_VAULT") (promptStringOnce . "op_vault" "1Password vault name") -}}
-{{- $op_service_account_token := or (env "OP_SERVICE_ACCOUNT_TOKEN") (promptStringOnce . "op_service_account_token" "1Password Service Account Token") -}}
-{{- $ai_cli_env := (env "CHEZMOI_AI_CLI") | lower -}}
-{{- $ai_cli := "" -}}
-{{- if or (eq $ai_cli_env "claude") (eq $ai_cli_env "claude-code") -}}
-{{- $ai_cli = "claude" -}}
-{{- else if or (eq $ai_cli_env "codex") (eq $ai_cli_env "none") -}}
-{{- $ai_cli = $ai_cli_env -}}
-{{- else -}}
-{{- $ai_cli = promptChoiceOnce . "ai_cli" "AI CLI to install" (list "claude" "codex" "none") -}}
+{{- /* Token is read from env by private_env.tmpl, never persisted in [data]. */ -}}
+{{- if eq (env "OP_SERVICE_ACCOUNT_TOKEN") "" -}}
+{{- fail "OP_SERVICE_ACCOUNT_TOKEN must be set in env. Bootstrap via install.sh — it is the only supported entry point." -}}
 {{- end -}}
 
 [data]
   agent_name = {{ $agent_name | quote }}
   agent_email = {{ $agent_email | quote }}
   agent_handle_github = {{ $agent_handle_github | quote }}
-  op_service_account_token = {{ $op_service_account_token | quote }}
   op_vault = {{ $op_vault | quote }}
-  ai_cli = {{ $ai_cli | quote }}
-  
+
+[onepassword]
+  mode = "service"

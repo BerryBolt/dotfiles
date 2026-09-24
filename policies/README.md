@@ -1,18 +1,18 @@
 # Policies
 
-Self-serve operations manual for managing this environment.
+Operational rules for the Omarchy user environment.
 
 ## Single source of truth
 
 **One source of truth for everything. No duplication.**
 
-| What | Source of truth |
-|------|-----------------|
-| Secrets | 1Password |
-| CLI tools | `~/.config/mise/config.toml` |
-| GUI apps / system deps | `Brewfile` |
-| Dotfiles | chezmoi source (`~/.local/share/chezmoi/home/`) |
-| Policies | This directory |
+| What                   | Source of truth                                 |
+| ---------------------- | ----------------------------------------------- |
+| Secrets                | 1Password                                       |
+| System packages        | Omarchy / pacman (outside this repo)            |
+| Bootstrap CLI tools    | `~/.config/mise/conf.d/dotfiles.toml` (from `home/dot_config/mise/conf.d/`) |
+| Dotfiles               | chezmoi source (`~/.local/share/chezmoi/home/`) |
+| Policies               | This directory                                  |
 
 MUST NOT duplicate definitions. If it exists in the source of truth, reference it — don't copy it.
 
@@ -26,19 +26,19 @@ MUST NOT duplicate definitions. If it exists in the source of truth, reference i
 
 ## Policy documents
 
-| Document | Purpose |
-|----------|---------|
-| [dependencies.md](dependencies.md) | Package management (mise, Homebrew) |
-| [credentials.md](credentials.md) | 1Password operations, compliance |
-| [dotfiles.md](dotfiles.md) | chezmoi operations |
-| [git.md](git.md) | Version control practices |
+| Document                           | Purpose                                       |
+| ---------------------------------- | --------------------------------------------- |
+| [dependencies.md](dependencies.md) | What Omarchy supplies and what this repo adds |
+| [credentials.md](credentials.md)   | 1Password operations, compliance              |
+| [chezmoi.md](chezmoi.md)           | chezmoi operations and managed-file rules     |
+| [git.md](git.md)                   | Version control practices                     |
 
 ## Tools
 
-| Tool | Purpose | Docs |
-|------|---------|------|
-| **mise** | Package manager for CLI tools | https://mise.jdx.dev |
-| **chezmoi** | Dotfiles management, templating | https://chezmoi.io |
-| **1Password CLI (`op`)** | Secrets management | https://developer.1password.com/docs/cli |
-| **git** | Version control for dotfiles | - |
-| **Homebrew** (macOS) | GUI apps, system dependencies | https://brew.sh |
+| Tool                     | Purpose                         | Docs                                     |
+| ------------------------ | ------------------------------- | ---------------------------------------- |
+| **Omarchy / pacman**     | Desktop, shell defaults, system packages (Git, OpenSSH, mise) | https://omarchy.org |
+| **mise**                 | User-level bootstrap CLI tools  | https://mise.jdx.dev                     |
+| **chezmoi**              | Dotfiles management, templating | https://chezmoi.io                       |
+| **1Password CLI (`op`)** | Secrets management              | https://developer.1password.com/docs/cli |
+| **git**                  | Version control for dotfiles    | -                                        |

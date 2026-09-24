@@ -1,0 +1,10 @@
+# 1Password CLI environment. Single source of truth for OP_* at rest.
+# See policies/credentials.md and ARCHITECTURE.md#secrets-model.
+{{- $token := env "OP_SERVICE_ACCOUNT_TOKEN" -}}
+{{- if eq $token "" -}}
+{{- fail "OP_SERVICE_ACCOUNT_TOKEN is not set. Invoke chezmoi via `chezmoi-with-op` or re-run install.sh." -}}
+{{- end }}
+
+OP_SERVICE_ACCOUNT_TOKEN="{{ $token }}"
+OP_VAULT="{{ .op_vault }}"
+OP_FORMAT="json"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-line bootstrap for Berry Bolt dotfiles
+# Bootstrap the Omarchy workstation fundamentals for an agent account.
 # Usage:
 #   curl -fsSL https://berrybolt.bot/install.sh | bash
 
@@ -7,8 +7,15 @@ set -euo pipefail
 
 SCRIPT_URL="https://berrybolt.bot/install.sh"
 NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
-OS_NAME="$(uname -s)"
-BREW_BIN=""
+SOURCE_DIR="$HOME/.local/share/chezmoi"
+
+# User-level tools this repo adds through mise. Keep in sync with
+# home/dot_config/mise/conf.d/dotfiles.toml (tests/regression.sh checks this).
+BOOTSTRAP_TOOLS=(chezmoi@latest 1password-cli@latest)
+
+# System prerequisites supplied by Omarchy. The installer checks them and
+# never installs them.
+REQUIRED_COMMANDS=(git ssh ssh-keygen mise)
 
 usage() {
   cat <<'EOF'
@@ -21,7 +28,6 @@ Env overrides:
   CHEZMOI_AGENT_HANDLE_GITHUB=...
   CHEZMOI_OP_VAULT=...
   OP_SERVICE_ACCOUNT_TOKEN=...
-  CHEZMOI_AI_CLI=claude|codex|none
 
 Optional:
   CHEZMOI_NONINTERACTIVE=1  # disable prompts (requires all env vars)
@@ -29,17 +35,22 @@ Optional:
 EOF
 }
 
-for arg in "$@"; do
-  case "$arg" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --non-interactive|--unattended)
-      NONINTERACTIVE=1
-      ;;
-  esac
-done
+parse_cli_args() {
+  for arg in "$@"; do
+    case "$arg" in
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      --non-interactive|--unattended)
+        NONINTERACTIVE=1
+        ;;
+      *)
+        log_error "Unknown argument: $arg (see --help)"
+        ;;
+    esac
+  done
+}
 
 abort() {
   stty echo < /dev/tty 2>/dev/null || true
@@ -66,52 +77,18 @@ log_header() {
   echo ""
   printf "=====================================\n"
   printf " BERRY BOLT DOTFILES\n"
-  printf " guided setup console\n"
+  printf " Omarchy workstation bootstrap\n"
   printf "=====================================\n"
   echo ""
 }
 
-require_cmd() {
-  cmd=$1
-  hint=${2-}
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    if [ -n "$hint" ]; then
-      log_error "Missing required command: $cmd. $hint"
-    else
-      log_error "Missing required command: $cmd"
-    fi
-  fi
-}
-
-find_brew() {
-  BREW_BIN=""
-  if command -v brew >/dev/null 2>&1; then
-    BREW_BIN="$(command -v brew)"
-  elif [ -x /opt/homebrew/bin/brew ]; then
-    BREW_BIN="/opt/homebrew/bin/brew"
-  elif [ -x /usr/local/bin/brew ]; then
-    BREW_BIN="/usr/local/bin/brew"
-  fi
-
-  [ -n "$BREW_BIN" ]
-}
-
 TTY_DEV=""
 
+# A readable /dev/tty node does not imply a controlling terminal; open it.
 detect_tty() {
   TTY_DEV=""
-  if command -v tty >/dev/null 2>&1; then
-    if tty >/dev/null 2>&1; then
-      TTY_DEV="/dev/tty"
-      return
-    fi
-  fi
-  if [ -r /dev/tty ]; then
+  if { : < /dev/tty; } 2>/dev/null; then
     TTY_DEV="/dev/tty"
-    return
-  fi
-  if [ -t 0 ]; then
-    TTY_DEV="/dev/stdin"
   fi
 }
 
@@ -139,70 +116,38 @@ trim_space() {
   printf "%s" "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
-ensure_mise_tool() {
-  tool=$1
-  spec=${2-"$tool@latest"}
-  binary=${3-"$tool"}
-  label=${4-"$tool"}
-
-  if ! command -v "$binary" >/dev/null 2>&1; then
-    log_info "Installing ${label}..."
-    if ! mise use -g "$spec" >/dev/null 2>&1; then
-      log_error "Failed to install ${label}"
-    fi
+preflight() {
+  if [ "$(id -u)" -eq 0 ]; then
+    log_error "Run this installer as the target user, not root."
   fi
 
-  if ! command -v "$binary" >/dev/null 2>&1; then
-    log_error "${label} not found. Install ${label} and re-run."
+  os_id=""
+  if [ -r /etc/os-release ]; then
+    os_id=$(. /etc/os-release && printf '%s' "${ID:-}")
   fi
-}
-
-ensure_homebrew() {
-  if [ "$OS_NAME" != "Darwin" ]; then
-    return
+  if [ "$os_id" != "omarchy" ]; then
+    log_error "Unsupported host (os-release ID: ${os_id:-unknown}). This installer supports Omarchy only."
   fi
 
-  if find_brew; then
-    eval "$("$BREW_BIN" shellenv)"
-    return
+  missing=""
+  for cmd in "${REQUIRED_COMMANDS[@]}"; do
+    command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
+  done
+  if [ -n "$missing" ]; then
+    log_error "Missing required commands:$missing
+Omarchy provides these by default. Reinstall the missing packages with pacman and re-run."
   fi
 
-  if [ -n "$NONINTERACTIVE" ]; then
-    log_info "Installing Homebrew in non-interactive mode..."
-    if ! NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
-      log_error "Homebrew install failed. On shared Macs, install Homebrew once with an Administrator account, then re-run."
-    fi
-  else
-    require_tty
-    log_info "Installing Homebrew..."
-    if ! /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < "$TTY_DEV"; then
-      log_error "Homebrew install failed. On shared Macs, install Homebrew once with an Administrator account, then re-run."
-    fi
+  if [ ! -f "$HOME/.bashrc" ]; then
+    # shellcheck disable=SC2088  # name the path as users know it
+    log_error "~/.bashrc is missing. Restore Omarchy's default (/etc/skel/.bashrc) and re-run."
   fi
-
-  if ! find_brew; then
-    log_error "Homebrew install completed but brew was not found on PATH or in the default install locations."
-  fi
-
-  eval "$("$BREW_BIN" shellenv)"
 }
 
 PROMPT_VALUE=""
 
 mask_token() {
   printf '%s' "$1" | awk '{ l=length($0); if (l<=4) print $0; else print "..." substr($0,l-3) }'
-}
-
-normalize_ai_cli() {
-  value=${1-}
-  if [ -n "$value" ]; then
-    value=$(printf "%s" "$value" | tr '[:upper:]' '[:lower:]')
-  fi
-  case "$value" in
-    claude|claude-code) printf "%s" "claude" ;;
-    codex|none) printf "%s" "$value" ;;
-    *) printf "%s" "" ;;
-  esac
 }
 
 prompt_string() {
@@ -277,71 +222,7 @@ prompt_secret() {
   done
 }
 
-prompt_ai_cli() {
-  current=$1
-  choice=""
-  selection=""
-
-  require_tty
-
-  while :; do
-    echo ""
-    echo "AI CLI to install"
-    echo "    claude = Anthropic, codex = OpenAI, none = skip."
-    if [ -n "$current" ]; then
-      echo "    Current: $current"
-      echo "    Select keep current to leave unchanged."
-      echo "    0) keep current ($current)"
-    fi
-    echo "    1) claude (Anthropic)"
-    echo "    2) codex (OpenAI)"
-    echo "    3) none"
-    printf "    Enter choice: "
-    read -r selection < "$TTY_DEV" || abort
-
-    if is_blank "$selection" && [ -n "$current" ]; then
-      choice="$current"
-    else
-      case "$selection" in
-        0)
-          if [ -n "$current" ]; then
-            choice="$current"
-          else
-            choice="invalid"
-          fi
-          ;;
-        1) choice="claude" ;;
-        2) choice="codex" ;;
-        3) choice="none" ;;
-        *) choice="invalid" ;;
-      esac
-    fi
-
-    case "$choice" in
-      claude|codex|none)
-        ;;
-      "$current")
-        if [ -n "$current" ]; then
-          :
-        else
-          log_info "Invalid choice. Try again."
-          continue
-        fi
-        ;;
-      *)
-        log_info "Invalid choice. Try again."
-        continue
-        ;;
-    esac
-
-    PROMPT_VALUE=$choice
-    echo "    ✓ AI CLI to install: $PROMPT_VALUE"
-    break
-  done
-}
-
 review_and_edit() {
-  choice=""
   require_tty
   while :; do
     echo ""
@@ -350,7 +231,6 @@ review_and_edit() {
     echo "    Agent email: $AGENT_EMAIL"
     echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
     echo "    1Password vault: $OP_VAULT"
-    echo "    AI CLI: $CHEZMOI_AI_CLI"
     if ! is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
       echo "    Token: set ($tail)"
@@ -365,25 +245,10 @@ review_and_edit() {
     echo "    4) Edit GitHub handle"
     echo "    5) Edit 1Password vault"
     echo "    6) Edit token"
-    echo "    7) Edit AI CLI"
-    printf "    Enter choice [1-7]: "
+    printf "    Enter choice [1-6]: "
     read -r selection < "$TTY_DEV" || abort
     case "$selection" in
-      1|"") choice="Confirm" ;;
-      2) choice="Edit agent name" ;;
-      3) choice="Edit agent email" ;;
-      4) choice="Edit GitHub handle" ;;
-      5) choice="Edit 1Password vault" ;;
-      6) choice="Edit token" ;;
-      7) choice="Edit AI CLI" ;;
-      *)
-        log_info "Invalid choice. Try again."
-        continue
-        ;;
-    esac
-
-    case "$choice" in
-      "Confirm")
+      1|"")
         if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
           log_info "1Password token required before continuing"
           prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
@@ -392,204 +257,212 @@ review_and_edit() {
         fi
         break
         ;;
-      "Edit agent name")
+      2)
         prompt_string "Agent name" "Berry Bolt" "$AGENT_NAME"
         AGENT_NAME=$PROMPT_VALUE
         ;;
-      "Edit agent email")
+      3)
         prompt_string "Agent email" "hi@example.bot" "$AGENT_EMAIL"
         AGENT_EMAIL=$PROMPT_VALUE
         ;;
-      "Edit GitHub handle")
+      4)
         prompt_string "GitHub handle" "BerryBolt" "$AGENT_HANDLE_GITHUB"
         AGENT_HANDLE_GITHUB=$PROMPT_VALUE
         ;;
-      "Edit 1Password vault")
+      5)
         prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
         OP_VAULT=$PROMPT_VALUE
         ;;
-      "Edit token")
+      6)
         prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
         OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
         ;;
-      "Edit AI CLI")
-        prompt_ai_cli "$CHEZMOI_AI_CLI"
-        CHEZMOI_AI_CLI=$PROMPT_VALUE
+      *)
+        log_info "Invalid choice. Try again."
         ;;
     esac
   done
 }
 
-require_cmd curl "Install curl and re-run."
-
-#
-# 1. Install mise
-#
-if ! command -v mise >/dev/null 2>&1; then
-  log_info "Installing mise..."
-  curl -fsSL https://mise.run | sh
-fi
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/.local/share/mise/shims:$PATH"
-if ! command -v mise >/dev/null 2>&1; then
-  log_error "mise installation failed or not on PATH"
-fi
-
-log_header
-
-log_info "Answer a few prompts. You can review and edit before apply."
-
-#
-# 2. Collect setup inputs
-#
-AGENT_NAME="${CHEZMOI_AGENT_NAME:-}"
-AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
-AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
-OP_VAULT="${CHEZMOI_OP_VAULT:-}"
-OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
-OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "$OP_SERVICE_ACCOUNT_TOKEN")
-case "$OP_SERVICE_ACCOUNT_TOKEN" in
-  ops_*) ;;
-  "")
-    OP_SERVICE_ACCOUNT_TOKEN=""
-    ;;
-  *)
-    log_info "1Password token looks invalid. You will be prompted."
-    OP_SERVICE_ACCOUNT_TOKEN=""
-    ;;
-esac
-
-CHEZMOI_AI_CLI="$(normalize_ai_cli "${CHEZMOI_AI_CLI:-}")"
-
-detect_tty
-if [ -n "${CHEZMOI_DEBUG:-}" ]; then
-  if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-    tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
-    log_info "debug: tty_dev=${TTY_DEV:-none} noninteractive=${NONINTERACTIVE:-0} token=$tail ai_cli=${CHEZMOI_AI_CLI:-none}"
-  else
-    log_info "debug: tty_dev=${TTY_DEV:-none} noninteractive=${NONINTERACTIVE:-0} token=missing ai_cli=${CHEZMOI_AI_CLI:-none}"
-  fi
-fi
-
-if [ -n "$NONINTERACTIVE" ]; then
+missing_inputs() {
   missing=""
   is_blank "$AGENT_NAME" && missing="$missing CHEZMOI_AGENT_NAME"
   is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
   is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
   is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
   is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
-  is_blank "$CHEZMOI_AI_CLI" && missing="$missing CHEZMOI_AI_CLI"
+  printf '%s' "$missing"
+}
 
-  if [ -n "$missing" ]; then
-    log_error "Non-interactive mode requires env vars:$missing"
-  fi
-elif ! has_tty; then
-  missing=""
-  is_blank "$AGENT_NAME" && missing="$missing CHEZMOI_AGENT_NAME"
-  is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
-  is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
-  is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
-  is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
-  is_blank "$CHEZMOI_AI_CLI" && missing="$missing CHEZMOI_AI_CLI"
+collect_inputs() {
+  AGENT_NAME="${CHEZMOI_AGENT_NAME:-}"
+  AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
+  AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
+  OP_VAULT="${CHEZMOI_OP_VAULT:-}"
+  OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "${OP_SERVICE_ACCOUNT_TOKEN:-}")
+  case "$OP_SERVICE_ACCOUNT_TOKEN" in
+    ops_*|"") ;;
+    *)
+      if [ -n "$NONINTERACTIVE" ]; then
+        log_error "OP_SERVICE_ACCOUNT_TOKEN does not look like a service account token (expected ops_...)."
+      fi
+      log_info "1Password token looks invalid. You will be prompted."
+      OP_SERVICE_ACCOUNT_TOKEN=""
+      ;;
+  esac
 
-  if [ -n "$missing" ]; then
-    log_error "No terminal detected.
+  detect_tty
+  if [ -n "$NONINTERACTIVE" ]; then
+    missing=$(missing_inputs)
+    if [ -n "$missing" ]; then
+      log_error "Non-interactive mode requires env vars:$missing"
+    fi
+  elif ! has_tty; then
+    missing=$(missing_inputs)
+    if [ -n "$missing" ]; then
+      log_error "No terminal detected.
 Set env vars:$missing
 Tip: curl -fsSL $SCRIPT_URL | bash"
-  fi
-else
-  if is_blank "$AGENT_NAME"; then
-    prompt_string "Agent name" "Berry Bolt" "$AGENT_NAME"
-    AGENT_NAME=$PROMPT_VALUE
-  fi
-  if is_blank "$AGENT_EMAIL"; then
-    prompt_string "Agent email" "hi@example.bot" "$AGENT_EMAIL"
-    AGENT_EMAIL=$PROMPT_VALUE
-  fi
-  if is_blank "$AGENT_HANDLE_GITHUB"; then
-    prompt_string "GitHub handle" "BerryBolt" "$AGENT_HANDLE_GITHUB"
-    AGENT_HANDLE_GITHUB=$PROMPT_VALUE
-  fi
-  if is_blank "$OP_VAULT"; then
-    prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
-    OP_VAULT=$PROMPT_VALUE
-  fi
-  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
-    echo "    See: https://github.com/BerryBolt/dotfiles/blob/main/skills/1password-setup/SKILL.md"
-    echo ""
-    prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
-    OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
+    fi
   else
-    tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
-    log_info "1Password token detected ($tail). You can edit in review."
+    log_info "Answer a few prompts. You can review and edit before apply."
+    if is_blank "$AGENT_NAME"; then
+      prompt_string "Agent name" "Berry Bolt" "$AGENT_NAME"
+      AGENT_NAME=$PROMPT_VALUE
+    fi
+    if is_blank "$AGENT_EMAIL"; then
+      prompt_string "Agent email" "hi@example.bot" "$AGENT_EMAIL"
+      AGENT_EMAIL=$PROMPT_VALUE
+    fi
+    if is_blank "$AGENT_HANDLE_GITHUB"; then
+      prompt_string "GitHub handle" "BerryBolt" "$AGENT_HANDLE_GITHUB"
+      AGENT_HANDLE_GITHUB=$PROMPT_VALUE
+    fi
+    if is_blank "$OP_VAULT"; then
+      prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
+      OP_VAULT=$PROMPT_VALUE
+    fi
+    if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
+      echo "    See: https://github.com/${AGENT_HANDLE_GITHUB}/dotfiles/blob/main/skills/1password-setup/SKILL.md"
+      echo ""
+      prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
+      OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
+    else
+      tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
+      log_info "1Password token detected ($tail). You can edit in review."
+    fi
+
+    review_and_edit
   fi
-  if is_blank "$CHEZMOI_AI_CLI"; then
-    prompt_ai_cli "$CHEZMOI_AI_CLI"
-    CHEZMOI_AI_CLI=$PROMPT_VALUE
+}
+
+install_bootstrap_tools() {
+  log_info "Installing bootstrap tools with mise: ${BOOTSTRAP_TOOLS[*]}"
+  if ! mise install --yes "${BOOTSTRAP_TOOLS[@]}"; then
+    log_error "mise failed to install: ${BOOTSTRAP_TOOLS[*]}"
+  fi
+}
+
+with_bootstrap_tools() {
+  mise exec "${BOOTSTRAP_TOOLS[@]}" -- "$@"
+}
+
+# Check the credential inputs before changing user configuration, so a bad
+# token, vault, or key item fails without a partial apply.
+verify_credentials() {
+  log_info "Verifying 1Password service account access..."
+  if ! whoami_json=$(with_bootstrap_tools op whoami --format json 2>/dev/null); then
+    log_error "1Password rejected the service account token. Check OP_SERVICE_ACCOUNT_TOKEN."
+  fi
+  case "$whoami_json" in
+    *'"SERVICE_ACCOUNT"'*) ;;
+    *) log_error "The 1Password token is not a service account token." ;;
+  esac
+  if ! with_bootstrap_tools op vault get "$OP_VAULT" >/dev/null 2>&1; then
+    log_error "The service account cannot access 1Password vault: $OP_VAULT"
+  fi
+  if ! with_bootstrap_tools op read "op://$OP_VAULT/id_ed25519/public key" >/dev/null 2>&1; then
+    log_error "Cannot read the SSH key item: op://$OP_VAULT/id_ed25519 (SSH Key with 'public key' and 'private key')"
+  fi
+}
+
+# Clone the public source on first install. Afterwards, sync over the SSH
+# remote that the apply script configured; never fall back to HTTPS.
+sync_source() {
+  repo=$1
+
+  if [ ! -e "$SOURCE_DIR" ]; then
+    log_info "Cloning dotfiles source from $repo..."
+    mkdir -p "$(dirname "$SOURCE_DIR")"
+    if ! git clone --quiet "$repo" "$SOURCE_DIR"; then
+      log_error "Failed to clone dotfiles source: $repo"
+    fi
+    return
   fi
 
-  review_and_edit
-fi
-
-#
-# 3. Install Homebrew on macOS if needed
-#
-ensure_homebrew
-
-export CHEZMOI_AGENT_NAME="$AGENT_NAME"
-export CHEZMOI_AGENT_EMAIL="$AGENT_EMAIL"
-export CHEZMOI_AGENT_HANDLE_GITHUB="$AGENT_HANDLE_GITHUB"
-export CHEZMOI_OP_VAULT="$OP_VAULT"
-export OP_SERVICE_ACCOUNT_TOKEN
-export CHEZMOI_AI_CLI
-
-#
-# 4. Configure 1Password mode for service accounts (before init)
-#
-export CHEZMOI_ONEPASSWORD_MODE="service"
-config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi"
-config_file="$config_dir/chezmoi.toml"
-rm -f "$config_file"
-mkdir -p "$config_dir"
-cat > "$config_file" <<'EOF'
-[onepassword]
-  mode = "service"
-EOF
-
-#
-# 5. Install chezmoi
-#
-ensure_mise_tool "chezmoi" "chezmoi@latest" "chezmoi" "chezmoi"
-
-#
-# 6. Install 1Password CLI (required for onepasswordRead)
-#
-ensure_mise_tool "1password-cli" "1password-cli@latest" "op" "1Password CLI (op)"
-
-#
-# 7. Ensure git (required for update and init)
-#
-ensure_mise_tool "git" "git@latest" "git" "git"
-
-#
-# 8. Update source repo if exists
-#
-if [ -d ~/.local/share/chezmoi/.git ]; then
-  log_info "Updating dotfiles repo..."
-  if ! git -C ~/.local/share/chezmoi pull --ff-only --quiet; then
-    log_error "git pull failed. Resolve local changes and re-run."
+  if [ ! -d "$SOURCE_DIR/.git" ]; then
+    log_error "$SOURCE_DIR exists but is not a git checkout."
   fi
-fi
 
-#
-# 9. Initialize and apply
-#
-log_info "Applying dotfiles..."
-if ! chezmoi init --apply BerryBolt/dotfiles; then
-  log_error "Bootstrap failed"
-fi
+  current_remote="$(git -C "$SOURCE_DIR" remote get-url origin 2>/dev/null || true)"
+  case "$current_remote" in
+    git@*|ssh://*|/*|file://*)
+      ;;
+    http://*|https://*)
+      log_error "chezmoi source remote must use SSH or a local path. Current origin: $current_remote"
+      ;;
+    "")
+      log_error "chezmoi source remote is blank; fix origin and re-run."
+      ;;
+    *)
+      log_error "Unsupported chezmoi source remote: $current_remote"
+      ;;
+  esac
 
-echo ""
-log_success "Bootstrap complete"
-echo '    Run: exec "$SHELL" -l'
-echo ""
+  log_info "Updating dotfiles source..."
+  if ! git -C "$SOURCE_DIR" pull --ff-only --quiet; then
+    log_error "git pull failed. SSH source sync must work before bootstrap can continue."
+  fi
+}
+
+bootstrap_main() {
+  repo=${1:-}
+
+  preflight
+  log_header
+  collect_inputs
+
+  if is_blank "$repo"; then
+    repo="https://github.com/${AGENT_HANDLE_GITHUB}/dotfiles.git"
+  fi
+
+  export CHEZMOI_AGENT_NAME="$AGENT_NAME"
+  export CHEZMOI_AGENT_EMAIL="$AGENT_EMAIL"
+  export CHEZMOI_AGENT_HANDLE_GITHUB="$AGENT_HANDLE_GITHUB"
+  export CHEZMOI_OP_VAULT="$OP_VAULT"
+  export OP_SERVICE_ACCOUNT_TOKEN
+
+  install_bootstrap_tools
+  verify_credentials
+  sync_source "$repo"
+
+  log_info "Applying dotfiles..."
+  if ! with_bootstrap_tools chezmoi init --apply; then
+    log_error "chezmoi apply failed"
+  fi
+
+  echo ""
+  log_success "Bootstrap complete"
+  echo '    Open a new terminal, or run: exec bash -l'
+  echo "    Credential commands: op, with-op, chezmoi-with-op (see policies/credentials.md)."
+  echo "    Re-run behavior and recovery scope: ARCHITECTURE.md#recovery."
+  echo ""
+}
+
+# Detect whether we are being sourced as a library (e.g. from tests/regression.sh).
+# When sourced, stop here — callers reuse the helper functions and bootstrap_main.
+(return 0 2>/dev/null) && return 0
+
+parse_cli_args "$@"
+
+bootstrap_main

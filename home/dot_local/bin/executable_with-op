@@ -1,0 +1,31 @@
+#!/bin/bash
+# Run one command with the 1Password service-account env loaded, without
+# exporting it to the calling shell. See policies/credentials.md.
+#
+#   with-op op whoami
+#   with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
+
+set -eu
+
+# Prepend known install locations so stripped-PATH callers (git hooks,
+# IDE task runners, cron) can still resolve op and other mise tools.
+export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
+
+ENV_FILE="$HOME/.config/op/env"
+
+if [ "$#" -eq 0 ]; then
+    echo "usage: with-op <command> [args...]" >&2
+    exit 2
+fi
+
+if [ ! -f "$ENV_FILE" ]; then
+    echo "error: $ENV_FILE not found. Restore it with chezmoi-with-op apply (see runbooks/1password-service-account.md)." >&2
+    exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+
+exec "$@"
