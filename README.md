@@ -13,6 +13,7 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - A 1Password service-account token scoped to the intended vault, with read and write item permissions there. The agent has no 1Password user account; see the [access model](policies/credentials.md#access-model).
 - An SSH Key item in that vault, with a valid OpenSSH private key and matching public key suitable for unattended use. The installer selects it by title or item ID (`CHEZMOI_OP_SSH_ITEM`); an ID keeps working if the item is renamed. It is always installed as `~/.ssh/id_ed25519`, whatever the item is called.
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
+- A `Purelymail` Login item in that vault with the agent's mailbox address (`username`) and password. Mail is configured from it.
 - A Server item in that vault with the account's OS login: `username` (the installing account) and `password`. The installer selects it by title or item ID (`CHEZMOI_OP_ACCOUNT_ITEM`). Setup pipes the password to sudo once to grant the account passwordless sudo, because the agent administers its own VM unattended.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
@@ -65,6 +66,7 @@ chezmoi-with-op apply        # reapply managed files and SSH restoration
 ssh -T git@github.com        # authenticates with the restored key
 git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
+himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.

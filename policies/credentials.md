@@ -149,6 +149,7 @@ Rules:
 - MUST NOT include "API key" in login items (separate item)
 - Service name MUST match official name (e.g., `GitHub` not `Github` or `github`)
 - The bootstrap selects its SSH Key item through the `op_ssh_item` chezmoi value (title or item ID), not by the naming convention. Prefer the item ID there so renaming the item cannot break key restoration.
+- Integrations reference their items by the naming-convention title, for example `Purelymail` for the agent's mailbox, so those titles MUST follow the convention.
 - The bootstrap selects the workstation account item through the `op_account_item` chezmoi value (title or item ID); prefer the item ID for the same reason. Its `username` must be the installed account.
 
 ### Item structure (mandatory)

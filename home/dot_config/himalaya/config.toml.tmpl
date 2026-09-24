@@ -1,0 +1,24 @@
+{{- /* The agent's own mailbox at Purelymail. The address comes from the
+     Purelymail item at render time; the password is read from 1Password on
+     each connection and never written to disk. */ -}}
+{{- $item := printf "op://%s/Purelymail" .op_vault -}}
+{{- $address := onepasswordRead (printf "%s/username" $item) -}}
+{{- $password_command := list (printf "%s/.local/bin/with-op" .chezmoi.homeDir) "op" "read" (printf "%s/password" $item) -}}
+# Managed by dotfiles (home/dot_config/himalaya/config.toml.tmpl).
+
+[accounts.purelymail]
+default = true
+email = {{ $address | quote }}
+display-name = {{ .agent_name | quote }}
+mailbox.alias.inbox = "INBOX"
+mailbox.alias.sent = "Sent"
+mailbox.alias.drafts = "Drafts"
+mailbox.alias.trash = "Trash"
+
+imap.server = "imaps://imap.purelymail.com:993"
+imap.sasl.plain.username = {{ $address | quote }}
+imap.sasl.plain.password.command = {{ $password_command | toJson }}
+
+smtp.server = "smtps://smtp.purelymail.com:465"
+smtp.sasl.plain.username = {{ $address | quote }}
+smtp.sasl.plain.password.command = {{ $password_command | toJson }}

@@ -103,6 +103,14 @@ check "xurl resolves through mise" xurl version
 check "dotfiles mise manifest is active" \
   bash -c 'mise config ls | grep -q "conf.d/dotfiles.toml"'
 
+echo "Mail"
+check "himalaya is installed" pacman -Q himalaya
+check "IMAP login works and lists the inbox" \
+  bash -c 'himalaya --json mailbox list | jq -e "[.mailboxes[].name | ascii_downcase] | index(\"inbox\")"'
+check "SMTP login works (NOOP; nothing is sent)" himalaya smtp raw -- NOOP
+check "the mail config stores no password" \
+  bash -c '! grep -q "password.raw" "$1"' _ "$HOME/.config/himalaya/config.toml"
+
 echo "Git identity and signing"
 check "git email is the agent email" \
   test "$(git config --global user.email)" = "$CHEZMOI_AGENT_EMAIL"
