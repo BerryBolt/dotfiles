@@ -2,7 +2,7 @@
 
 Chezmoi-managed fundamentals for an Omarchy agent workstation: Bash integration, scoped 1Password access, Git/SSH, and repeatable user configuration.
 
-**Status:** candidate implementation under acceptance testing on a disposable Omarchy VM. It is not yet merged to `main` or served by the bootstrap endpoint.
+**Status:** candidate implementation, not yet merged to `main` or served by the bootstrap endpoint. Fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
 Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for the bootstrap flow, managed state, and recovery contract.
 
