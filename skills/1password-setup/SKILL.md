@@ -21,7 +21,7 @@ This step requires human action in the 1Password web console:
 1. Go to https://my.1password.com → Settings → Automation → Service Accounts
 2. Click "Create Service Account"
 3. Name it (e.g., "Berry Bolt Agent")
-4. Select vault access (grant access to the agent's vault)
+4. Grant the agent's vault only, with read and write item permissions (`read_items`, `write_items`), so the agent can store the credentials it creates. Do not allow sharing or vault creation. These choices cannot be changed later; changing them means a new service account. See [policies/credentials.md § Access model](../../policies/credentials.md#access-model).
 5. Copy the service account token (shown once)
 
 **Important:** The token is shown only once. Store it in a vault the service account itself has NO access to (typically your personal vault) — not in the agent's own vault. See [policies/credentials.md § Vault rules](../../policies/credentials.md#vault-rules) for the rationale.
@@ -37,9 +37,10 @@ After bootstrap, open a new Omarchy terminal. The `op` shell function loads `~/.
 ```bash
 op whoami
 op vault list
+op vault list --permission write_items
 ```
 
-Expected output shows the service account name and accessible vaults.
+Expected output shows the service account name and accessible vaults; the agent's vault also appears in the `write_items` list.
 
 ### 4. Test Read Access
 

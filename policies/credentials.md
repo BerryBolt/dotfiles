@@ -9,6 +9,16 @@
 - SHOULD prefer in-memory workflows such as `op run` or `op inject` over writing secrets to disk.
 - When a new secret is created or obtained, it MUST be stored in 1Password immediately using the conventions in this policy.
 
+## Access model
+
+The agent works like an employee with its own accounts: it signs up for services, keeps its own logins, and stores the credentials it creates. Its only 1Password identity is its own service account.
+
+- MUST access 1Password only through the agent's service account, scoped to the agent's vault. The agent has no 1Password user account, so it MUST NOT depend on the desktop app, the browser extension, the 1Password SSH agent, shell plugins, or `op signin`.
+- A user account does not fit an unattended agent. Those apps unlock with a master password or system authentication, which assumes a person at the keyboard; unlocking them unattended would mean keeping the master password on the workstation. A service account works unattended, reaches only the vaults it was granted, is revoked on its own, and its access appears in the account's activity log.
+- The service account has read and write item permissions (`read_items`, `write_items`) in the agent's vault, and no sharing or vault-management permissions. The agent stores every credential it creates or receives there (see Workflows).
+- The human owner administers the 1Password account and keeps the service-account token outside the agent's vault (see Vault rules).
+- Service-account permissions are fixed at creation. To change vaults or permissions, create a replacement service account and [rotate the token](../runbooks/1password-service-account.md#rotate-the-token).
+
 ## Environment setup
 
 Required environment variables for `op`:
@@ -74,12 +84,10 @@ Manual sourcing is acceptable inside scripts that exit when they finish, where t
 
 ## Operational assumptions
 
-- You have a dedicated 1Password account for the agent environment.
 - Access SHOULD be available non-interactively through the 1Password CLI.
 - The default env file for `op` and `chezmoi-with-op` is `~/.config/op/env`.
 - The managed runtime env SHOULD set `OP_FORMAT=json` so agent-driven `op` commands default to machine-readable output.
 - If you do not have access to 1Password, you MUST stop and ask for access rather than inventing an alternate secret store.
-- You MUST use the service-account flow in this environment and MUST NOT rely on `op signin`.
 
 ## Validate access
 
@@ -105,7 +113,7 @@ The `op` shell wrapper loads `~/.config/op/env` for each call automatically (see
 
 | Use case | Category | CLI flag |
 |----------|----------|----------|
-| Website/service login | `Login` | `--category="Login"` |
+| Website, service, or workstation account login | `Login` | `--category="Login"` |
 | API key or token | `API Credential` | `--category="API Credential"` |
 | SSH key | `SSH Key` | `--category="SSH Key"` |
 | Credential file (JSON/PEM) | `Document` | `--category="Document"` |
@@ -117,6 +125,7 @@ MUST use the correct category. MUST NOT use generic categories like `Password` o
 | Type | Pattern | Examples |
 |------|---------|----------|
 | Login | `<Service>` | `GitHub`, `Brave`, `Notion` |
+| Workstation account | `<hostname>` | The agent's own OS login on its VM (username and account password) |
 | API key | `<Service> - API key` | `Brave Search - API key`, `Firecrawl - API key` |
 | Credential file | `<Service> - Credential File` | `Google Cloud - Credential File` |
 | SSH key | `<key filename>` | `id_ed25519` (new items) |

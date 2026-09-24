@@ -10,7 +10,7 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 
 - An installed Omarchy workstation and the intended user account, provided by the platform owner. Run the installer as that user, not root.
 - Omarchy's default Bash, Git, OpenSSH, and mise. The installer checks for them and stops with an error if one is missing.
-- A 1Password service-account token scoped to the intended vault.
+- A 1Password service-account token scoped to the intended vault, with read and write item permissions there. The agent has no 1Password user account; see the [access model](policies/credentials.md#access-model).
 - An SSH Key item in that vault, with a valid OpenSSH private key and matching public key suitable for unattended use. The installer selects it by title or item ID (`CHEZMOI_OP_SSH_ITEM`); an ID keeps working if the item is renamed. It is always installed as `~/.ssh/id_ed25519`, whatever the item is called.
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
 

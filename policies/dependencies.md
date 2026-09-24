@@ -15,6 +15,7 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 - Go default first: if Omarchy provides a tool, including through an on-demand launcher, use Omarchy's route and do not declare the tool here.
 - For tools Omarchy lacks, prefer user-level installs through mise; use pacman for what needs the system package manager.
 - MUST NOT duplicate a tool Omarchy already provides.
+- 1Password: the repo installs only the CLI, from the manifest. Omarchy's `omarchy-install-service-1password` adds the desktop app and browser extension, which a service account cannot sign in to, so it is not used (see the [access model](credentials.md#access-model)).
 - SHOULD NOT write `~/.config/mise/config.toml`: Omarchy's on-demand launchers record their tools there on first use. The repo's tools live in the additive manifest `~/.config/mise/conf.d/dotfiles.toml`, which mise loads alongside it.
 - `install.sh` checks for the Omarchy-provided prerequisites (`git`, `ssh`, `ssh-keygen`, `mise`) and stops with an actionable error when one is missing.
 

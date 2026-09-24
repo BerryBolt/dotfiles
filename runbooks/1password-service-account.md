@@ -33,6 +33,7 @@ The file is NEVER sourced into a parent shell — only into one-shot child proce
 ```bash
 op whoami
 op vault list
+op vault list --permission write_items
 ```
 
 In an interactive Bash terminal, the `op` function loads `~/.config/op/env` automatically per call; from scripts, use `with-op op ...`. `OP_FORMAT=json` is set inside the wrapper process, so you do not need `--format json` explicitly. See `policies/credentials.md` for the wrapper architecture.
@@ -40,6 +41,7 @@ In an interactive Bash terminal, the `op` function loads `~/.config/op/env` auto
 Expected:
 - `op whoami` returns `user_type: SERVICE_ACCOUNT`.
 - `op vault list` includes the target vault.
+- `op vault list --permission write_items` includes the target vault, so the agent can store the credentials it creates.
 - Secrets can be read without an interactive sign-in.
 
 ## Rotate the token
@@ -94,7 +96,7 @@ rm ~/.ssh/id_ed25519.stale.<timestamp> ~/.ssh/id_ed25519.pub.stale.<timestamp>
 
 | Symptom                                    | Cause / Fix                                                                 |
 | ------------------------------------------ | --------------------------------------------------------------------------- |
-| Write fails with `(101) You do not have permission` | Service account lacks vault write permissions. Update in 1Password web console. |
+| Write fails with `(101) You do not have permission` | The service account lacks `write_items` in the vault. Permissions cannot be changed after creation: create a replacement service account with read and write item permissions, then rotate the token (above). |
 | chezmoi templates prompt for or reject 1Password sign-in | `[onepassword] mode` is not `service` in `~/.config/chezmoi/chezmoi.toml`, or chezmoi ran without `chezmoi-with-op`. |
 | `~/.config/op/env not found` from `with-op` or `chezmoi-with-op` | The env file is missing. See "Restore a missing env file". |
 | `op whoami` returns a non-service user     | Token in `env` is a personal token, not a service account. Rotate per above. |
