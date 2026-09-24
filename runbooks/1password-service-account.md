@@ -19,7 +19,7 @@ Use 1Password CLI non-interactively through a service account, with the token sc
 | `OP_VAULT`                 | chezmoi data: `op_vault`                                        |
 | `OP_FORMAT`                | hardcoded `"json"`                                              |
 
-The token is NOT persisted in chezmoi data. It reaches the template only through the process env of whichever chezmoi invocation is rendering. On first bootstrap `install.sh` exports it; on subsequent applies `chezmoi-with-op` sources this same file before invoking chezmoi and re-supplies the token that way. A bare `chezmoi apply` without `chezmoi-with-op` will fail fast via a template guard rather than silently clobber the file with an empty token.
+The token is NOT persisted in chezmoi data. It reaches the template only through the process env of whichever chezmoi invocation is rendering. On first bootstrap `install.sh` exports it; on subsequent applies `chezmoi-with-op` sources this same file before invoking chezmoi and re-supplies the token that way. A token the caller supplies to `chezmoi-with-op` for one command takes precedence over the file; that is how the file is restored or rotated (below). A bare `chezmoi apply` without `chezmoi-with-op` will fail fast via a template guard rather than silently clobber the file with an empty token.
 
 You MUST NOT hand-edit `~/.config/op/env`. It is a chezmoi-managed target and any edit will be overwritten on the next `chezmoi apply`. To change the vault, use the data-rotation workflow in `policies/chezmoi.md`. To rotate the token, see "Rotate the token" below.
 
@@ -44,12 +44,25 @@ Expected:
 
 ## Rotate the token
 
-The token is not stored in chezmoi data. Rotation goes through `install.sh`, which re-renders `~/.config/op/env` with the new value.
+The token is not stored in chezmoi data. Supply the new token to `chezmoi-with-op` for one apply; it takes precedence over the old value in the file and re-renders `~/.config/op/env`.
 
-1. Revoke old token in 1Password web console → Settings → Automation → Service Accounts.
-2. Generate a new token.
-3. Re-run `install.sh` with the same account inputs and the new token. It re-renders `~/.config/op/env`.
-4. `op whoami` — verify the new token works.
+1. Generate a new token in the 1Password web console → Settings → Automation → Service Accounts.
+2. In a terminal, without putting the token in history or the parent environment:
+   ```bash
+   read -rsp 'New token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply; unset t
+   ```
+3. `op whoami` — verify the new token works.
+4. Revoke the old token.
+
+## Restore a missing env file
+
+If `~/.config/op/env` was deleted, `op`, `with-op`, and `chezmoi-with-op` fail with the restore command. Supply the token for one command and restore only that file:
+
+```bash
+read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply --force ~/.config/op/env; unset t
+```
+
+`--force` is required because chezmoi treats a deleted managed file as a local change and would otherwise ask before recreating it. Naming the target limits it to this file. The file comes back at mode 0600 in a 0700 directory; run `op whoami` to confirm.
 
 ## Rotate the SSH signing key
 
@@ -83,7 +96,7 @@ rm ~/.ssh/id_ed25519.stale.<timestamp> ~/.ssh/id_ed25519.pub.stale.<timestamp>
 | ------------------------------------------ | --------------------------------------------------------------------------- |
 | Write fails with `(101) You do not have permission` | Service account lacks vault write permissions. Update in 1Password web console. |
 | chezmoi templates prompt for or reject 1Password sign-in | `[onepassword] mode` is not `service` in `~/.config/chezmoi/chezmoi.toml`, or chezmoi ran without `chezmoi-with-op`. |
-| `with-op: ~/.config/op/env not found` | The env file is missing. Restore it with `install.sh` (see "Rotate the token"). |
+| `~/.config/op/env not found` from `with-op` or `chezmoi-with-op` | The env file is missing. See "Restore a missing env file". |
 | `op whoami` returns a non-service user     | Token in `env` is a personal token, not a service account. Rotate per above. |
 
 ## Storage pattern for binary and JSON secrets

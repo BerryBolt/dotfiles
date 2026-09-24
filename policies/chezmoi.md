@@ -84,7 +84,7 @@ chezmoi-with-op cat ~/.gitconfig
 
 Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env` in logged sessions; their output contains the token.
 
-`chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), sources `~/.config/op/env`, execs `chezmoi` with the token in env, and exits cleanly. The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
+`chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.config/op/env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
 
 If you forget and run bare `chezmoi apply`, you'll see:
 
@@ -102,7 +102,7 @@ That's the signal to re-run with `chezmoi-with-op`.
 
 ### Rotate a persisted data value
 
-Use when a value that came from a bootstrap prompt needs to change — updating the agent email, switching the 1Password vault, etc. The service-account token is NOT in chezmoi data; rotate it via `install.sh` (see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md#rotate-the-token)).
+Use when a value that came from a bootstrap prompt needs to change — updating the agent email, switching the 1Password vault, etc. The service-account token is NOT in chezmoi data; rotate it by supplying the new token to `chezmoi-with-op` (see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md#rotate-the-token)).
 
 ```bash
 chezmoi edit-config          # edit the value in $EDITOR          (no token)

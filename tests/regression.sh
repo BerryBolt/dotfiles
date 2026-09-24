@@ -14,7 +14,12 @@ set -euo pipefail
 SRC="$(cd "${1:-$(dirname "${BASH_SOURCE[0]}")/..}" && pwd)"
 TMP_ROOT="${TMPDIR:-/tmp}"
 WORK="$(mktemp -d "${TMP_ROOT%/}/dotfiles-regression.XXXXXX")"
-trap 'rm -rf "$WORK"' EXIT
+# KEEP_WORK=1 keeps the fixtures and $WORK/log for debugging.
+if [ -n "${KEEP_WORK:-}" ]; then
+  echo "Keeping $WORK"
+else
+  trap 'rm -rf "$WORK"' EXIT
+fi
 
 CHEZMOI_BIN="$(command -v chezmoi)" || { echo "chezmoi is required on PATH" >&2; exit 1; }
 BASE_PATH="$WORK/fakebin:$(dirname "$CHEZMOI_BIN"):/usr/bin:/bin:/usr/sbin:/sbin"
@@ -359,6 +364,45 @@ parent=" ]
 }
 check "op() loads the token only into the wrapped command" op_function_scopes_token
 
+# chezmoi-with-op token precedence, exercised with real chezmoi applies.
+CWO="$H/.local/bin/chezmoi-with-op"
+# cwo_apply <token or ""> [apply args...]
+cwo_apply() {
+  local token=$1
+  shift
+  in_home "$H" ${token:+env OP_SERVICE_ACCOUNT_TOKEN="$token"} "$CWO" apply --no-tty --exclude=scripts "$@" </dev/null
+}
+env_token_is() {
+  grep -qxF "OP_SERVICE_ACCOUNT_TOKEN=\"$1\"" "$H/.config/op/env"
+}
+
+missing_env_restored_with_supplied_token() {
+  rm "$H/.config/op/env"
+  cwo_apply ops_fixture_two --force "$H/.config/op/env" && env_token_is ops_fixture_two &&
+    [ "$(perm_of "$H/.config/op/env")" = 600 ]
+}
+check "chezmoi-with-op restores a missing env file from a supplied token" missing_env_restored_with_supplied_token
+
+supplied_token_wins_over_file() {
+  cwo_apply ops_fixture_three && env_token_is ops_fixture_three
+}
+check "a supplied token re-renders the env file instead of reusing the old one" supplied_token_wins_over_file
+
+check "without a supplied token the env file's token is kept" \
+  eval 'cwo_apply "" && env_token_is ops_fixture_three'
+
+missing_env_and_token_fails() {
+  local out
+  mv "$H/.config/op/env" "$WORK/env.saved"
+  out=$(cwo_apply "" 2>&1) && rc=0 || rc=$?
+  mv "$WORK/env.saved" "$H/.config/op/env"
+  [ "$rc" -ne 0 ] && case $out in *"not found and OP_SERVICE_ACCOUNT_TOKEN was not supplied"*) true ;; *) false ;; esac
+}
+check "chezmoi-with-op fails clearly with neither env file nor token" missing_env_and_token_fails
+
+# Later cases expect the original fixture token.
+cwo_apply ops_fixture_one >/dev/null 2>&1
+
 with_op_requires_env_file() {
   local h out
   h=$(new_home)
@@ -447,6 +491,6 @@ mv "$WORK/env.saved" "$H/.config/op/env"
 echo ""
 printf '%d passed, %d failed\n' "$pass" "$fail"
 if [ "$fail" -ne 0 ]; then
-  echo "Details: rerun with the log kept, or inspect failing cases above." >&2
+  echo "Details: rerun with KEEP_WORK=1 and read \$WORK/log." >&2
   exit 1
 fi

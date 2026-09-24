@@ -38,7 +38,7 @@ Bootstrap does not install agent CLIs, start an agent service, clone an agent wo
 | --- | --- | --- |
 | `~/.bashrc` | `home/modify_dot_bashrc` | Keeps Omarchy's file byte-for-byte and maintains one marked block that defines `op()` as `with-op op`. Fails if the file is missing or the block markers are damaged. |
 | `~/.local/bin/with-op` | `home/dot_local/bin/executable_with-op` | Runs one command with `~/.config/op/env` loaded into that process only. |
-| `~/.local/bin/chezmoi-with-op` | `home/dot_local/bin/executable_chezmoi-with-op` | Runs chezmoi with the token loaded for template rendering. |
+| `~/.local/bin/chezmoi-with-op` | `home/dot_local/bin/executable_chezmoi-with-op` | Runs chezmoi with the token for template rendering: a token supplied in the caller's environment wins, otherwise `~/.config/op/env`; with neither it fails. |
 | `~/.config/op/env` | `home/dot_config/private_op/private_env.tmpl` | Token, vault, and `OP_FORMAT=json`; mode 0600 in a 0700 directory. `~/.config` keeps Omarchy's mode. |
 | `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares `chezmoi` and `1password-cli`. `~/.config/mise/config.toml` stays user-owned. |
 | `~/.gitconfig` | `home/dot_gitconfig.tmpl` | Identity and SSH commit/tag signing with `~/.ssh/id_ed25519`. Omarchy's `~/.config/git/config` still applies underneath. |
@@ -74,7 +74,7 @@ The retained scope is:
 
 - Restore a missing SSH private key from 1Password through reapply.
 - Detect a rotated key and align signing verification with the replacement. Script 30 currently moves the on-disk key aside as `~/.ssh/id_ed25519.stale.<timestamp>` before it fetches the replacement.
-- Restore `~/.config/op/env` when the caller explicitly supplies a valid token. **Pending:** `chezmoi-with-op` still refuses to run when the env file is missing.
+- Restore `~/.config/op/env` when the caller explicitly supplies a valid token: `OP_SERVICE_ACCOUNT_TOKEN=... chezmoi-with-op apply --force ~/.config/op/env`. A supplied token takes precedence over the file, so after a token rotation a plain `chezmoi-with-op apply` with the new token re-renders the file instead of reusing the old value. Without a supplied token and without the file, `chezmoi-with-op` and `with-op` fail with the restore command. `--force` is needed only because chezmoi treats a deleted managed file as a local change and would otherwise ask before recreating it; naming the single target keeps the override narrow.
 
 Use local `chezmoi-with-op apply` for key recovery before attempting SSH source synchronization. `install.sh` pulls an existing source before apply and cannot be the repair path for missing SSH credentials. Tool reinstall, workspace restoration, runtime data backup, and general broken-machine recovery are outside this contract.
 

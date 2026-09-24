@@ -64,7 +64,7 @@ If token is compromised:
 1. Go to 1Password web console → Service Accounts
 2. Revoke old token
 3. Create new token
-4. Re-run `install.sh` and supply the new token at the prompt — it will re-render `~/.config/op/env`
+4. Re-render `~/.config/op/env` with the new token: `read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply; unset t` (see [runbooks/1password-service-account.md](../../runbooks/1password-service-account.md#rotate-the-token))
 5. `op whoami` to verify
 
 ## References

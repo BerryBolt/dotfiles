@@ -19,7 +19,8 @@ if [ "$#" -eq 0 ]; then
 fi
 
 if [ ! -f "$ENV_FILE" ]; then
-    echo "error: $ENV_FILE not found. Restore it with chezmoi-with-op apply (see runbooks/1password-service-account.md)." >&2
+    echo "error: $ENV_FILE not found. Restore it by supplying the token to chezmoi-with-op:" >&2
+    echo "         read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=\$t chezmoi-with-op apply --force ~/.config/op/env; unset t" >&2
     exit 1
 fi
 

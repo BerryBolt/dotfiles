@@ -2,6 +2,16 @@
 # Invoke chezmoi with the 1Password service-account token loaded for
 # template rendering, without exporting it to the parent shell.
 # See policies/chezmoi.md "Token-aware invocations".
+#
+# Token source, first match wins:
+#   1. OP_SERVICE_ACCOUNT_TOKEN supplied by the caller for this command.
+#      It can restore a missing ~/.config/op/env and, after a token
+#      rotation, re-renders the file instead of reusing the old value.
+#   2. ~/.config/op/env.
+#
+# chezmoi treats a deleted managed file as locally changed and asks before
+# recreating it, so restore a missing env file with the narrow
+# `apply --force ~/.config/op/env` shown below.
 
 set -eu
 
@@ -11,19 +21,27 @@ export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 
 ENV_FILE="$HOME/.config/op/env"
 
-if [ ! -f "$ENV_FILE" ]; then
-    echo "error: $ENV_FILE not found. Re-run install.sh or chezmoi apply." >&2
-    exit 1
-fi
-
 if ! command -v chezmoi >/dev/null 2>&1; then
     echo "error: chezmoi not found. Expected at ~/.local/share/mise/shims/chezmoi. Re-run install.sh." >&2
     exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-set +a
+if [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+    export OP_SERVICE_ACCOUNT_TOKEN
+elif [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+    set +a
+    if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+        echo "error: $ENV_FILE does not set OP_SERVICE_ACCOUNT_TOKEN." >&2
+        exit 1
+    fi
+else
+    echo "error: $ENV_FILE not found and OP_SERVICE_ACCOUNT_TOKEN was not supplied." >&2
+    echo "       Restore the file by supplying the token for one command:" >&2
+    echo "         read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=\$t chezmoi-with-op apply --force ~/.config/op/env; unset t" >&2
+    exit 1
+fi
 
 exec chezmoi "$@"
