@@ -162,6 +162,7 @@ Available in `.tmpl` files:
 | `{{ .agent_handle_github }}`      | GitHub username                            |
 | `{{ .op_vault }}`                 | 1Password vault name                       |
 | `{{ .op_ssh_item }}`              | SSH Key item title or ID in that vault     |
+| `{{ .op_account_item }}`          | Workstation account (Server) item title or ID in that vault |
 | `{{ .chezmoi.homeDir }}`          | Home directory path                        |
 | `{{ .chezmoi.arch }}`             | CPU architecture, e.g. `amd64`             |
 | `{{ .chezmoi.hostname }}`         | Machine hostname                           |

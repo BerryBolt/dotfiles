@@ -83,6 +83,15 @@ check "~/.config/op/env is 600" mode_is "$HOME/.config/op/env" 600
 check "chezmoi config does not persist the token" \
   bash -c '! grep -q "ops_" "$1"' _ "$HOME/.config/chezmoi/chezmoi.toml"
 
+echo "Sudo"
+SUDOERS_FILE=/etc/sudoers.d/05-dotfiles-nopasswd
+check "sudo runs without a password (rule, not a cached timestamp)" sudo -k -n true
+check "sudoers rule is root:root 0440" \
+  test "$(sudo -n stat -c '%a %U:%G' "$SUDOERS_FILE")" = "440 root:root"
+check "sudoers rule grants this account NOPASSWD: ALL" \
+  sudo -n grep -qxF "$(id -un) ALL=(ALL:ALL) NOPASSWD: ALL" "$SUDOERS_FILE"
+check "sudoers configuration is valid" sudo -n visudo -c
+
 echo "Tools"
 check "chezmoi resolves through mise" chezmoi --version
 check "op resolves through mise" op --version

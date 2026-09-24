@@ -113,7 +113,8 @@ The `op` shell wrapper loads `~/.config/op/env` for each call automatically (see
 
 | Use case | Category | CLI flag |
 |----------|----------|----------|
-| Website, service, or workstation account login | `Login` | `--category="Login"` |
+| Website/service login | `Login` | `--category="Login"` |
+| Workstation account (the agent's OS login) | `Server` | `--category="Server"` |
 | API key or token | `API Credential` | `--category="API Credential"` |
 | SSH key | `SSH Key` | `--category="SSH Key"` |
 | Credential file (JSON/PEM) | `Document` | `--category="Document"` |
@@ -125,7 +126,7 @@ MUST use the correct category. MUST NOT use generic categories like `Password` o
 | Type | Pattern | Examples |
 |------|---------|----------|
 | Login | `<Service>` | `GitHub`, `Brave`, `Notion` |
-| Workstation account | `<hostname>` | The agent's own OS login on its VM (username and account password) |
+| Workstation account | `<hostname>` | The VM's hostname |
 | API key | `<Service> - API key` | `Brave Search - API key`, `Firecrawl - API key` |
 | Credential file | `<Service> - Credential File` | `Google Cloud - Credential File` |
 | SSH key | `<key filename>` | `id_ed25519` (new items) |
@@ -136,12 +137,14 @@ Rules:
 - MUST NOT include "API key" in login items (separate item)
 - Service name MUST match official name (e.g., `GitHub` not `Github` or `github`)
 - The bootstrap selects its SSH Key item through the `op_ssh_item` chezmoi value (title or item ID), not by the naming convention. Prefer the item ID there so renaming the item cannot break key restoration.
+- The bootstrap selects the workstation account item through the `op_account_item` chezmoi value (title or item ID); prefer the item ID for the same reason. Its `username` must be the installed account.
 
 ### Item structure (mandatory)
 
 | Item type | Required fields | Optional fields |
 |-----------|-----------------|-----------------|
 | Login | username, password | website, 2FA (totp), recovery codes |
+| Server (workstation account) | username, password in the main section | URL; leave the Admin Console and Hosting Provider sections empty |
 | API Credential | credential | notes (linked login) |
 | SSH Key | private_key | - |
 | Document | file attachment | notes (linked login) |

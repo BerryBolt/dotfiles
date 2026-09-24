@@ -3,10 +3,11 @@
 # Recovery acceptance for an installed Omarchy account.
 #
 # DESTRUCTIVE to managed state, which it then restores: deletes
-# ~/.ssh/id_ed25519 and ~/.config/op/env and swaps in a generated fixture
-# key. Run only on a disposable or test account. The live 1Password item
-# and GitHub registration are never changed; the rotation case simulates a
-# machine that still holds a previous key (a test-owned fixture).
+# ~/.ssh/id_ed25519, ~/.config/op/env, and the passwordless sudo rule, and
+# swaps in a generated fixture key. Run only on a disposable or test account.
+# The live 1Password items and GitHub registration are never changed; the
+# rotation case simulates a machine that still holds a previous key (a
+# test-owned fixture).
 #
 # The service-account token for the env-file restore is read from stdin
 # (one line) so it never appears in arguments or logs:
@@ -94,6 +95,13 @@ check "signing works after adoption" signed_commit_verifies
 if [ -n "$new_stale" ]; then
   rm -f "$new_stale" "${new_stale/id_ed25519.stale./id_ed25519.pub.stale.}"
 fi
+
+echo "Missing passwordless sudo rule"
+SUDOERS_FILE=/etc/sudoers.d/05-dotfiles-nopasswd
+sudo -n rm -f "$SUDOERS_FILE"
+check "sudo asks for a password without the rule" bash -c '! sudo -k -n true 2>/dev/null'
+check "reapply restores the rule with the account password from 1Password" reapply
+check "sudo runs without a password again" sudo -k -n true
 
 echo "Missing credential env file"
 rm -f "$ENV_FILE"

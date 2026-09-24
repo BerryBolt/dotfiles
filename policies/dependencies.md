@@ -11,7 +11,7 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 | User-level tools Omarchy lacks | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`) |
 | System packages | This repo, through pacman (not implemented yet) | Packages the workstation needs beyond Omarchy's base |
 
-- Everything the workstation needs MUST be declared in this repo and installed by apply or `install.sh`; nothing is installed by hand. The agent has full administrative rights in its VM, so system packages are in scope; declare them and install them with pacman when that increment lands.
+- Everything the workstation needs MUST be declared in this repo and installed by apply or `install.sh`; nothing is installed by hand. The agent has full administrative rights in its VM, and setup grants its account passwordless sudo (ARCHITECTURE.md, script 20), so system packages are in scope; declare them and install them with pacman when that increment lands.
 - Go default first: if Omarchy provides a tool, including through an on-demand launcher, use Omarchy's route and do not declare the tool here.
 - For tools Omarchy lacks, prefer user-level installs through mise; use pacman for what needs the system package manager.
 - MUST NOT duplicate a tool Omarchy already provides.

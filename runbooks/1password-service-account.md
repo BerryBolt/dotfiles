@@ -92,6 +92,15 @@ ls ~/.ssh/id_ed25519.stale.*
 rm ~/.ssh/id_ed25519.stale.<timestamp> ~/.ssh/id_ed25519.pub.stale.<timestamp>
 ```
 
+## Change the workstation account password
+
+The Server item selected by chezmoi data `op_account_item` holds the agent account's OS login. Setup uses its password only to install the passwordless sudo rule while that rule is missing (script 20 in [ARCHITECTURE.md](../ARCHITECTURE.md#managed-state)). The desktop login and screen lock also use it.
+
+1. On the workstation, change the password: `sudo passwd "$USER"`.
+2. Update the item's `password` field to the new value.
+
+No reapply is needed: the sudo rule does not depend on the password. Keep the item current, because the next rule restore reads it.
+
 ## Troubleshooting
 
 | Symptom                                    | Cause / Fix                                                                 |

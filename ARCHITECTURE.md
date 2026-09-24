@@ -15,14 +15,14 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; system packages; agent CLIs; services; integrations; and safe resumption belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; system packages; agent CLIs; services; integrations; and safe resumption belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
 - `.chezmoiroot` selects `home/` as the managed source root.
 - The default checkout is `~/.local/share/chezmoi`; user configuration is rendered into the home directory.
 - Policies, runbooks, skills, and tests stay in the source repository and are not applied.
-- Account name, email, GitHub handle, vault name, and the SSH key item selector (`op_ssh_item`, a title or item ID) are chezmoi data. The service-account token is never persisted in chezmoi data or committed source.
+- Account name, email, GitHub handle, vault name, and the item selectors for the SSH key (`op_ssh_item`) and the workstation account (`op_account_item`), each a title or item ID, are chezmoi data. The service-account token is never persisted in chezmoi data or committed source.
 - Source updates and target applies are separate operations. Review source changes, then apply them with the required credential context.
 
 Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies/chezmoi.md). Isolate development rendering and testing from the operator's real home directory.
@@ -30,8 +30,8 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 ## Bootstrap flow
 
 1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything; it never installs system packages.
-2. **Inputs.** It collects the account name, email, GitHub handle, vault, SSH key item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
-3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, and the SSH key item is readable. Bad credentials fail here, before any configuration is written.
+2. **Inputs.** It collects the account name, email, GitHub handle, vault, SSH key item, workstation account item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
+3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, the SSH key item is readable, and the workstation account item names the installing account. While sudo still asks for a password, it also checks the item's password against sudo. Bad credentials fail here, before any configuration is written.
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 
@@ -50,6 +50,7 @@ The current implementation does not yet install agent CLIs, start services, or c
 | `~/.config/git/allowed_signers` | `home/dot_config/git/allowed_signers.tmpl` | Agent email and the public key of the `op_ssh_item` item. |
 | `~/.local/share/ssh-bootstrap/` | `home/dot_local/share/ssh-bootstrap/` | GitHub host keys and fingerprints pinned from GitHub's documentation. |
 | Script 10 | `run_once_after_10-install-mise-tools.sh.tmpl` | Installs the tools named in the manifest (read at render time); reruns when the manifest hash changes. |
+| Script 20 | `run_after_20-passwordless-sudo.sh.tmpl` | Ensures `/etc/sudoers.d/05-dotfiles-nopasswd` (root:root 0440) grants the account `NOPASSWD: ALL`. While sudo still asks for a password, it pipes the `op_account_item` password to `sudo -S` to install the rule, validating it with `visudo` before it takes effect. It fails if sudo still needs a password afterwards. The file sorts after the installer's per-user rule and before Omarchy's narrower rules. |
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
 
 In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are available. Omarchy puts `~/.local/bin` and the mise shims on `PATH` for login and SSH shells; both wrappers also prepend those directories themselves for stripped-`PATH` callers. Non-interactive callers use `with-op op ...` because the `op()` function exists only in interactive shells.
@@ -67,7 +68,7 @@ Pinned GitHub host keys establish trust before authenticated Git operations. Git
 Keep install steps distinct from state restoration:
 
 - `run_once_after_` suits installs tied to a manifest. Script 10 embeds the manifest hash so changes to that separate file retrigger installation.
-- `run_after_` is required for SSH state that must be restored even when the script content has not changed.
+- `run_after_` is required for SSH and sudo state that must be restored even when the script content has not changed.
 - Required dependency, credential, key, and authentication failures stop the operation.
 
 Do not turn these scripts into general repair orchestration. Package managers own reinstalling missing tool binaries.
@@ -78,14 +79,15 @@ The retained scope is:
 
 - Restore a missing SSH private key from 1Password through reapply.
 - Detect a rotated key, preserve the previous key until the replacement is verified, and align signing verification with the replacement. Script 30 fetches the new private key to a temporary file and checks that it derives the item's public key. Only then does it move the old key to `~/.ssh/id_ed25519.stale.<timestamp>` and install the new one. A bad or mismatched item fails and leaves the current key in place. `allowed_signers` is re-rendered from the same item in the same apply.
+- Restore a missing or altered passwordless sudo rule through reapply. Script 20 uses the account password from 1Password only in that case; while the rule works, sudo needs neither 1Password nor the password.
 - Restore `~/.config/op/env` when the caller explicitly supplies a valid token: `OP_SERVICE_ACCOUNT_TOKEN=... chezmoi-with-op apply --force ~/.config/op/env`. A supplied token takes precedence over the file, so after a token rotation a plain `chezmoi-with-op apply` with the new token re-renders the file instead of reusing the old value. Without a supplied token and without the file, `chezmoi-with-op` and `with-op` fail with the restore command. `--force` is needed only because chezmoi treats a deleted managed file as a local change and would otherwise ask before recreating it; naming the single target keeps the override narrow.
 
 Use local `chezmoi-with-op apply` for key recovery before attempting SSH source synchronization. `install.sh` pulls an existing source before apply and cannot be the repair path for missing SSH credentials. Tool reinstall, workspace restoration, runtime data backup, and general broken-machine recovery are outside this contract.
 
 ## Validation
 
-- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), credential scope and permissions, identity and local commit signing, key and host trust, SSH source sync, and managed-file drift.
-- `tests/recovery.sh` runs on a disposable installed account. It proves the recovery paths above: a deleted key, a previous (fixture) key being replaced, and a deleted env file restored from a token supplied on stdin.
+- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, credential scope and permissions, identity and local commit signing, key and host trust, SSH source sync, and managed-file drift.
+- `tests/recovery.sh` runs on a disposable installed account. It proves the recovery paths above: a deleted key, a previous (fixture) key being replaced, a deleted sudo rule restored with the account password from 1Password, and a deleted env file restored from a token supplied on stdin.
 
 Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository: the installer is downloaded from `raw.githubusercontent.com/.../<sha>/install.sh` and run with `--revision <sha>`, so the installer and the applied source are the same commit on fresh and repeat installs. Machine access and private operational context stay in ignored local inputs.
 

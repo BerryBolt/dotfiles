@@ -29,6 +29,8 @@ Env overrides:
   CHEZMOI_AGENT_HANDLE_GITHUB=...
   CHEZMOI_OP_VAULT=...
   CHEZMOI_OP_SSH_ITEM=...   # SSH Key item title or ID in that vault
+  CHEZMOI_OP_ACCOUNT_ITEM=...  # Server item title or ID with this account's
+                               # username and password (for sudo)
   OP_SERVICE_ACCOUNT_TOKEN=...
 
 Optional:
@@ -256,6 +258,7 @@ review_and_edit() {
     echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
     echo "    1Password vault: $OP_VAULT"
     echo "    1Password SSH key item: $OP_SSH_ITEM"
+    echo "    1Password workstation account item: $OP_ACCOUNT_ITEM"
     if ! is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
       echo "    Token: set ($tail)"
@@ -270,8 +273,9 @@ review_and_edit() {
     echo "    4) Edit GitHub handle"
     echo "    5) Edit 1Password vault"
     echo "    6) Edit 1Password SSH key item"
-    echo "    7) Edit token"
-    printf "    Enter choice [1-7]: "
+    echo "    7) Edit 1Password workstation account item"
+    echo "    8) Edit token"
+    printf "    Enter choice [1-8]: "
     read -r selection < "$TTY_DEV" || abort
     case "$selection" in
       1|"")
@@ -304,6 +308,10 @@ review_and_edit() {
         OP_SSH_ITEM=$PROMPT_VALUE
         ;;
       7)
+        prompt_string "1Password workstation account item (title or ID)" "$(uname -n)" "$OP_ACCOUNT_ITEM"
+        OP_ACCOUNT_ITEM=$PROMPT_VALUE
+        ;;
+      8)
         prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
         OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
         ;;
@@ -321,6 +329,7 @@ missing_inputs() {
   is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
   is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
   is_blank "$OP_SSH_ITEM" && missing="$missing CHEZMOI_OP_SSH_ITEM"
+  is_blank "$OP_ACCOUNT_ITEM" && missing="$missing CHEZMOI_OP_ACCOUNT_ITEM"
   is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
   printf '%s' "$missing"
 }
@@ -331,6 +340,7 @@ collect_inputs() {
   AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
   OP_VAULT="${CHEZMOI_OP_VAULT:-}"
   OP_SSH_ITEM="${CHEZMOI_OP_SSH_ITEM:-}"
+  OP_ACCOUNT_ITEM="${CHEZMOI_OP_ACCOUNT_ITEM:-}"
   OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "${OP_SERVICE_ACCOUNT_TOKEN:-}")
   case "$OP_SERVICE_ACCOUNT_TOKEN" in
     ops_*|"") ;;
@@ -378,6 +388,10 @@ Tip: curl -fsSL $SCRIPT_URL | bash"
       prompt_string "1Password SSH key item (title or ID)" "id_ed25519" "$OP_SSH_ITEM"
       OP_SSH_ITEM=$PROMPT_VALUE
     fi
+    if is_blank "$OP_ACCOUNT_ITEM"; then
+      prompt_string "1Password workstation account item (title or ID)" "$(uname -n)" "$OP_ACCOUNT_ITEM"
+      OP_ACCOUNT_ITEM=$PROMPT_VALUE
+    fi
     if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       echo "    See: https://github.com/${AGENT_HANDLE_GITHUB}/dotfiles/blob/main/skills/1password-setup/SKILL.md"
       echo ""
@@ -419,6 +433,19 @@ verify_credentials() {
   fi
   if ! with_bootstrap_tools op read "op://$OP_VAULT/$OP_SSH_ITEM/public key" >/dev/null 2>&1; then
     log_error "Cannot read the SSH key item: op://$OP_VAULT/$OP_SSH_ITEM (SSH Key with 'public key' and 'private key'). Check CHEZMOI_OP_SSH_ITEM."
+  fi
+  account_ref="op://$OP_VAULT/$OP_ACCOUNT_ITEM"
+  if ! account_user=$(with_bootstrap_tools op read "$account_ref/username" 2>/dev/null); then
+    log_error "Cannot read the workstation account item: $account_ref (Server item with 'username' and 'password'). Check CHEZMOI_OP_ACCOUNT_ITEM."
+  fi
+  if [ "$account_user" != "$(id -un)" ]; then
+    log_error "$account_ref is the login for '$account_user', not '$(id -un)'. Check CHEZMOI_OP_ACCOUNT_ITEM."
+  fi
+  # Apply uses the password only while sudo still asks for one; check it then.
+  # -k ignores a cached timestamp so the item's password is actually tested.
+  if ! sudo -k -n true 2>/dev/null &&
+    ! with_bootstrap_tools op read "$account_ref/password" 2>/dev/null | sudo -k -S -p '' true 2>/dev/null; then
+    log_error "sudo rejected the account password in $account_ref. Update the item's password."
   fi
 }
 
@@ -510,6 +537,7 @@ bootstrap_main() {
   export CHEZMOI_AGENT_HANDLE_GITHUB="$AGENT_HANDLE_GITHUB"
   export CHEZMOI_OP_VAULT="$OP_VAULT"
   export CHEZMOI_OP_SSH_ITEM="$OP_SSH_ITEM"
+  export CHEZMOI_OP_ACCOUNT_ITEM="$OP_ACCOUNT_ITEM"
   export OP_SERVICE_ACCOUNT_TOKEN
 
   install_bootstrap_tools
