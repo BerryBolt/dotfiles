@@ -2,7 +2,7 @@
 
 Chezmoi-managed fundamentals for an Omarchy agent workstation: Bash integration, scoped 1Password access, Git/SSH, and repeatable user configuration.
 
-**Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM. The `berrybolt.bot` bootstrap endpoint is managed separately and may not serve this installer yet.
+**Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
 Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for the bootstrap flow, managed state, and recovery contract.
 
@@ -36,7 +36,7 @@ The installer prompts for the account name, email, GitHub handle, vault, SSH key
 )
 ```
 
-The published `berrybolt.bot` endpoint is managed outside this repository and may serve an earlier installer until it is updated.
+`https://berrybolt.bot/install.sh` redirects to `install.sh` on this repository's `main` branch.
 
 The source comes from `https://github.com/<GitHub handle>/dotfiles.git`, on its default branch unless you pin a revision.
 

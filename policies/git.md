@@ -29,21 +29,23 @@ fix: restore credential env through reapply
 feat: install a selected dotfiles revision from GitHub
 ```
 
-## Public GitHub validation
+## Working on `main`
 
-The selected implementation workflow includes atomic commits and candidate-branch pushes to [BerryBolt/dotfiles](https://github.com/BerryBolt/dotfiles). Push a coherent, locally checked candidate before testing its installation on the disposable VM. Follow the ignored local `PLAN.md` (when present) for the exact sequence and target.
+Commit and push directly to `main` on [BerryBolt/dotfiles](https://github.com/BerryBolt/dotfiles); do not create implementation or candidate branches. `https://berrybolt.bot/install.sh` redirects to `install.sh` on `main`, so every push to `main` is immediately the published installer.
 
-- Use an implementation branch for candidate commits. Testing does not require merging to `main` or changing the public bootstrap endpoint.
-- Verify the full pushed SHA. The VM must retrieve both the installer and chezmoi source from that revision.
+- Push only commits that pass the local checks (`tests/regression.sh`, `shellcheck`, the private-data review below). Push with plain fast-forwards.
+- Validate on the disposable VM after pushing: install from `raw.githubusercontent.com/BerryBolt/dotfiles/<full-sha>/install.sh` with `--revision <full-sha>`, so the installer and chezmoi source are the same pushed commit. Follow the ignored local `PLAN.md` (when present) for the exact sequence and target.
 - Commit and push fixes as new commits. Reset the disposable VM test setup before each fresh-install attempt until installation passes; then complete the broader checks and final acceptance run.
 - Record test evidence without real credentials or secret-bearing logs. Mark unperformed tests explicitly.
-- Remote install evidence follows the candidate push; do not describe a published candidate as verified before its tests pass.
+- Do not describe a pushed commit as verified before its tests pass.
 
 ## Synchronization and staging
 
-Check local changes and remote state before beginning work. Fetch and inspect divergence; fast-forward a clean branch where appropriate. Do not pull into this existing mixed working tree merely to satisfy a synchronization ritual.
+Check local changes and remote state before beginning work. Fetch and inspect divergence; fast-forward `main` with `git merge --ff-only origin/main` while it is checked out. Do not pull into a mixed working tree merely to satisfy a synchronization ritual.
 
-Stage only the reviewed files or hunks for the intended commit. Confirm `git diff --cached` matches the logical change, then commit and push the candidate branch. Remaining local work must stay intact for subsequent commits.
+Stage only the reviewed files or hunks for the intended commit. Confirm `git diff --cached` matches the logical change, then commit and push `main`. Remaining local work must stay intact for subsequent commits.
+
+Checking out a commit that still tracked a now-ignored local file (such as `PLAN.md` before it was untracked) overwrites that file, and moving forward again deletes it. Back up ignored local files before checking out older commits.
 
 ## Prohibited operations
 
@@ -60,4 +62,4 @@ Do not commit real secrets/tokens, SSH private keys, machine-local chezmoi confi
 
 Before pushing, inspect both the actual staged diff and the committed candidate for private operational data. Ignore rules do not remove data already staged or tracked. Never force-add `PLAN.md`, `.env`, `tests/.env.local`, or `.local/`.
 
-Default-branch promotion, endpoint publication, and dedicated-workstation deployment remain distinct from pushing candidate commits for testing.
+Pushing to `main` publishes the installer through the endpoint. Deployment to a dedicated workstation remains a separate, explicit step.
