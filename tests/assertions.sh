@@ -113,10 +113,6 @@ check "~/.ssh/id_ed25519 is 600" mode_is "$HOME/.ssh/id_ed25519" 600
 check "allowed_signers matches the on-disk key" \
   test "$(awk '{print $1, $2, $3}' "$HOME/.config/git/allowed_signers")" = \
   "$CHEZMOI_AGENT_EMAIL $(pub_of_key "$HOME/.ssh/id_ed25519")"
-check "~/.ssh/config is 600 with exactly one dotfiles block" \
-  bash -c '[ "$(stat -c %a "$1")" = 600 ] && [ "$(grep -c "^# >>> dotfiles >>>$" "$1")" -eq 1 ]' _ "$HOME/.ssh/config"
-check "GitHub SSH goes to ssh.github.com:443 with pinned host keys" \
-  bash -c 'g=$(ssh -G github.com) && grep -qx "hostname ssh.github.com" <<<"$g" && grep -qx "port 443" <<<"$g" && grep -qx "hostkeyalias github.com" <<<"$g"'
 check "known_hosts pins exactly the repo's GitHub keys" \
   cmp -s <(grep '^github\.com ' "$HOME/.ssh/known_hosts") \
   <(grep '^github\.com ' "$HOME/.local/share/ssh-bootstrap/github_known_hosts")

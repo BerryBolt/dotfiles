@@ -60,7 +60,7 @@ Open a normal Omarchy terminal:
 op whoami                    # service account; the token stays in op's subshell
 with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
 chezmoi-with-op apply        # reapply managed files and SSH restoration
-ssh -T git@github.com        # authenticates with the restored key (via ssh.github.com:443)
+ssh -T git@github.com        # authenticates with the restored key
 git commit -S ...            # commits are signed by default
 ```
 
