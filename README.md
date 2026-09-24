@@ -1,6 +1,6 @@
 # Dotfiles
 
-Chezmoi-managed fundamentals for an Omarchy agent workstation: Bash integration, scoped 1Password access, Git/SSH, and repeatable user configuration.
+The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
 
 **Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
@@ -9,14 +9,14 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 ## Prerequisites
 
 - An installed Omarchy workstation and the intended user account, provided by the platform owner. Run the installer as that user, not root.
-- Omarchy's default Bash, Git, OpenSSH, and mise. The installer checks for them and stops with an error if one is missing; it does not install system packages.
+- Omarchy's default Bash, Git, OpenSSH, and mise. The installer checks for them and stops with an error if one is missing.
 - A 1Password service-account token scoped to the intended vault.
 - An SSH Key item in that vault, with a valid OpenSSH private key and matching public key suitable for unattended use. The installer selects it by title or item ID (`CHEZMOI_OP_SSH_ITEM`); an ID keeps working if the item is renamed. It is always installed as `~/.ssh/id_ed25519`, whatever the item is called.
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-No model provider, Telegram bot, agent runtime, or workspace repository is required.
+The current increment needs no model provider, agent runtime, or workspace repository.
 
 ## Install
 

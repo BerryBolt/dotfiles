@@ -1,12 +1,12 @@
 # AGENTS.md
 
-This repo is the local `chezmoi` source repo for Omarchy workstation fundamentals.
+This repo is the local `chezmoi` source repo for the agent's complete Omarchy workstation setup.
 
 ## Purpose
 
-Use this repo for Omarchy user bootstrap, scoped credentials, Bash integration, Git/SSH configuration, operational policies, and bootstrap runbooks.
+This repo is the agent's setup: one command from a fresh Omarchy install to the complete, working account, and reapply to converge. It owns packages and tools, OS maintenance, all user-level configuration, credential bootstrap from 1Password, Git/SSH/GitHub access, runtime services, integrations, and safe resumption, plus the policies and runbooks for them.
 
-Identity, memory, and post-bootstrap runtime behavior belong in the agent workspace repo.
+The workspace repo owns the agent's persona, instructions, projects, and working material. Mutable runtime state stays out of both.
 
 ## Read this first
 
@@ -23,8 +23,8 @@ Any work done in this repo MUST align with `VISION.md` and MUST NOT violate the 
 
 ## Current scope and handoff
 
-- Omarchy is the only installation target. Preserve its existing shell and tool configuration.
-- Keep the bootstrap harness-agnostic. Agent CLIs, model/provider auth, runtime services, integrations, workspace cloning, and first-wake files are deferred.
+- Omarchy is the only installation target. Build on its defaults and supported commands; do not break its initialization or its updates.
+- Deliver the full setup incrementally. Add each capability (tools, packages, desktop/terminal/theme settings, agent CLIs, services, integrations) as its own validated increment. Track the sequence in `PLAN.md`.
 - Describe only implemented and verified behavior as current. Record pending work and validation evidence in `PLAN.md`, not as claims in public docs.
 - `PLAN.md` is the single local implementation checklist and private handoff. It is ignored by Git; never stage or force-add it.
 - Deliver coherent atomic commits directly on `main`; do not create implementation branches. `https://berrybolt.bot/install.sh` redirects to `install.sh` on `main`, so every push publishes the installer. Push only locally checked commits. VM testing installs the pushed commit from the public GitHub repository, and the installer and chezmoi source must use the same full commit SHA. Follow PLAN for the loop; do not substitute an uncommitted copy of the working tree.
@@ -40,17 +40,17 @@ Any work done in this repo MUST align with `VISION.md` and MUST NOT violate the 
 
 ## Boundaries
 
-- `dotfiles` owns:
-  - machine bootstrap
-  - `chezmoi` management
-  - portable config templates
-  - operational policies
-  - bootstrap and recovery runbooks
+- `dotfiles` owns the agent's workstation setup:
+  - packages, tools, and OS maintenance
+  - all user-level configuration, managed through `chezmoi`
+  - credential bootstrap from 1Password; Git, SSH, and GitHub access
+  - runtime services, integrations, and safe resumption after a restore
+  - operational policies, and setup and recovery runbooks
 - the agent workspace repo owns:
-  - identity
-  - memory
-  - behavioral policies
-  - runtime-local workflows after wake-up
+  - persona and instructions
+  - projects and working material
+- the platform owns the VM, the Omarchy installation and initial access, network isolation, backups, and host recovery; it hands a verified VM to this repo.
+- mutable runtime state (sessions, caches, databases, working data) stays outside Git and follows its own backup and restore contract.
 
 ## Vision
 
@@ -63,7 +63,6 @@ An ignored local `PLAN.md` may track implementation of that vision; public docum
 - Use `policies/chezmoi.md` for managed-file rules and the chezmoi workflow.
 - Use `policies/credentials.md` for 1Password and secret handling.
 - Use `policies/dependencies.md` for what Omarchy supplies and what this repo adds.
-- Runtime capability setup is deferred to the future harness or workspace setup.
 - Use `policies/git.md` for repo workflow.
 - Prefer simple, load-bearing bootstrap paths over defensive fallbacks. When a dependency or invariant is required for correct operation, do not add best-effort continuations, silent skips, placeholder recovery, or alternate protocol fallbacks just to keep going; fail fast with a clear error instead. If a flow is intentionally recoverable or best-effort, that exception must be documented explicitly in the architecture or runbook that owns it.
 - Do not create unit tests, fixture suites, or mocks. Validate on the disposable Omarchy VM with `tests/assertions.sh` and `tests/recovery.sh` against the pushed SHA.

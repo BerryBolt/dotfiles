@@ -13,7 +13,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 - You MUST use templates for values that vary by machine, agent identity, or secret source.
 - You MUST source secrets from 1Password or machine-local config. You MUST NOT commit secret values.
 - You MUST NOT track volatile runtime state such as logs, caches, browser profiles, session databases, device keys, pairing state, generated media, or other ephemeral files.
-- You MUST NOT take over a whole file that Omarchy owns (such as `~/.bashrc`) or the user's `~/.config/mise/config.toml`. Extend them with a `modify_` script or an additive include (see below).
+- You MUST manage all user-level configuration the workstation relies on through this repo. Choose the narrowest mechanism: own a file outright when only this repo writes it; extend a file that Omarchy or another tool also writes (such as `~/.bashrc`) with a `modify_` script or an additive include (see below); apply settings Omarchy exposes through its commands (for example, theme and font) from a script.
 
 ## Default layout
 
@@ -33,7 +33,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 └── tests/
 ```
 
-### Extending Omarchy-owned files
+### Extending files that others also write
 
 `~/.bashrc` belongs to Omarchy's defaults and the user. `home/modify_dot_bashrc` is a chezmoi [modify script](https://www.chezmoi.io/reference/target-types/#scripts): chezmoi passes the current file on stdin and writes back its stdout. The script keeps every existing byte and maintains exactly one block between `# >>> dotfiles >>>` and `# <<< dotfiles <<<`, replacing it in place when its content changes. It fails, rather than guessing, when `~/.bashrc` is missing or the markers are damaged.
 

@@ -1,19 +1,21 @@
 # Dependencies
 
-What the Omarchy workstation supplies and what this repo adds on top.
+What Omarchy supplies, and how this repo declares and installs everything else the workstation needs.
 
 ## Ownership
 
-| Layer | Owner | Examples |
+| Layer | Source | Examples |
 | --- | --- | --- |
-| Desktop, shell defaults, system packages | Omarchy / pacman | Bash and its init, Git, OpenSSH, curl, mise, and the shell conveniences Omarchy's init loads |
-| User-level bootstrap tools | This repo, via mise | `chezmoi`, 1Password CLI (`op`) |
-| User's own mise tools | The user | Entries in `~/.config/mise/config.toml` |
-| Agent CLIs and runtimes | Future harness/workspace setup | Out of scope here |
+| Omarchy base | Omarchy installation | Bash and its init, Git, OpenSSH, curl, mise, desktop and shell defaults |
+| User-level tools | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`) |
+| System packages | This repo, through pacman (not implemented yet) | Packages the workstation needs beyond Omarchy's base |
+| Omarchy on-demand installs | Omarchy's `~/.local/bin` launchers | They run `mise use -g <tool>`, which writes `~/.config/mise/config.toml` |
 
-- This repo MUST NOT install system packages. `install.sh` checks for the Omarchy-provided prerequisites (`git`, `ssh`, `ssh-keygen`, `mise`) and stops with an actionable error when one is missing.
-- This repo MUST NOT duplicate tools Omarchy already provides, and MUST NOT install shell conveniences or a second shell.
-- This repo MUST NOT write `~/.config/mise/config.toml`. Its tools live in the additive manifest `~/.config/mise/conf.d/dotfiles.toml`, which mise loads alongside the user's global config.
+- Everything the workstation needs MUST be declared in this repo and installed by apply or `install.sh`; nothing is installed by hand. The agent has full administrative rights in its VM, so system packages are in scope; declare them and install them with pacman when that increment lands.
+- Prefer user-level installs through mise when mise provides the tool; use pacman for what needs the system package manager.
+- MUST NOT duplicate a tool Omarchy already provides.
+- SHOULD NOT write `~/.config/mise/config.toml`: Omarchy's on-demand launchers write it. The repo's tools live in the additive manifest `~/.config/mise/conf.d/dotfiles.toml`, which mise loads alongside it and which makes the matching launcher unnecessary.
+- `install.sh` checks for the Omarchy-provided prerequisites (`git`, `ssh`, `ssh-keygen`, `mise`) and stops with an actionable error when one is missing.
 
 ## Bootstrap tools manifest
 

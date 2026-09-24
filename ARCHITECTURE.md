@@ -1,16 +1,21 @@
 # Architecture
 
-[Vision](VISION.md) defines an Omarchy-only workstation baseline, independent of agent harnesses. The ignored local `PLAN.md` (when present) tracks implementation tasks and validation evidence.
+[Vision](VISION.md) defines this repository as the agent's complete, one-command Omarchy workstation setup, delivered in increments. This document describes what is implemented now. The ignored local `PLAN.md` (when present) tracks the next increments and validation evidence.
 
 ## Responsibility boundaries
 
 | Layer | Owner | Responsibility |
 | --- | --- | --- |
-| VM and OS | Platform provisioning / Omarchy | Provisioning, desktop, accounts, administrative rights, private access, isolation, platform restart behavior |
-| User bootstrap | This repo | Chezmoi, scoped 1Password access, Bash integration, Git identity/signing, SSH restore and trust |
-| Agent execution | Future harness/workspace setup | Provider authentication, runtime services, workspace placement, integrations, identity, memory, behavior |
+| VM and platform | Platform provisioning | VM, Omarchy installation and initial access, network attachment and isolation, backups, host recovery |
+| Workstation setup | This repo | Packages and tools, OS maintenance, all user-level configuration, credential bootstrap, Git/SSH/GitHub access, runtime services, integrations, safe resumption |
+| Agent content | Workspace repo | Persona, instructions, projects, working material |
+| Runtime state | Its own backup contract | Sessions, caches, databases, working data; never in Git |
 
-Omarchy is the sole deployment target. The bootstrap preserves its Bash initialization and unrelated mise settings.
+Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: it preserves Bash initialization and the user's mise settings, and extends files that Omarchy also writes.
+
+### Implemented so far
+
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; system packages; agent CLIs; services; integrations; and safe resumption belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
@@ -30,7 +35,7 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 
-Bootstrap does not install agent CLIs, start an agent service, clone an agent workspace, select a model, or create a first-wake file.
+The current implementation does not yet install agent CLIs, start services, or configure integrations. Those arrive as later increments of this repository. Cloning the workspace repository and restoring runtime state are separate from configuration synchronization.
 
 ## Managed state
 
@@ -87,11 +92,11 @@ Acceptance happens on a disposable Omarchy VM that installs a pushed candidate f
 ## Invariants
 
 1. Omarchy is the only installation target; unsupported hosts fail before mutation.
-2. Preserve Omarchy shell initialization, desktop configuration, and unrelated user/tool settings.
+2. Build on Omarchy: keep its shell initialization and updates working, prefer its supported commands, and extend files it or other tools also write. Only files listed in Managed state are owned outright.
 3. Keep secrets out of Git and out of the parent interactive shell environment.
 4. Every required bootstrap step either succeeds or exits with a clear error.
 5. After installer input collection, template rendering and apply do not introduce further prompts.
-6. Reapply is safe and does not require a harness, provider, integration, or workspace repository.
+6. Reapply is safe, converges without drift, and does not depend on the workspace repository or on runtime state.
 7. SSH restoration remains an ensure-state operation; source sync does not fall back to HTTPS.
 8. Removing source management does not authorize deleting existing user data, uninstalling tools, or destroying a workspace.
 9. Completion requires evidence for the workstation fundamentals; package presence alone is insufficient.

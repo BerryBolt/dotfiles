@@ -2,45 +2,39 @@
 
 ## North star
 
-Prepare a usable, reproducible Omarchy workstation for an agent account, independent of which agent harness may be selected later.
+One command turns a freshly installed Omarchy VM into the agent's complete, working workstation.
 
-Omarchy is the only supported target. Reuse means another account or machine can use the same fundamentals with different identity and vault values; it does not require support for other operating systems.
+This repository is the authoritative, reproducible definition of the agent account's setup. It covers every tool, package, configuration, and service the workstation needs, with no manual steps beyond supplying credentials. Running it again converges the machine to that definition. Rebuilding a lost workstation takes a clean Omarchy VM, this repository, 1Password, and the separately restored runtime state.
 
-## Bootstrap outcome
-
-Starting from an installed Omarchy desktop and the intended user account:
-
-1. Check the required shell, package, Git, and OpenSSH prerequisites.
-2. Establish chezmoi management and scoped 1Password service-account access.
-3. Restore the account's SSH key and configure Git identity, signing, and GitHub host trust.
-4. Make those capabilities available in Omarchy's normal Bash terminal.
-5. Prove that managed configuration can be reapplied and the documented credential/key recovery paths work.
-
-Bootstrap ends when the user can use the workstation's fundamentals. An authenticated agent conversation, background agent service, or first-wake file is not an acceptance condition.
+Omarchy is the only supported target. Reuse means another agent account can run the same setup with different identity and vault values; it does not require support for other operating systems.
 
 ## Ownership
 
-- **Platform provisioning:** VM provisioning, Omarchy installation, accounts and guest administrative rights, private access, external isolation, and platform restart behavior.
-- **Dotfiles:** the user environment on that workstation, chezmoi, bootstrap credentials, Git/SSH configuration, and their operational documentation.
-- **Future harness or workspace setup:** model/provider choice, authentication, agent services, integrations, workspace location, identity, memory, and task behavior.
+- **Platform provisioning:** the VM, the Omarchy installation and initial access, network attachment and external isolation, backups, and host recovery. The platform hands a verified VM to this repository and does not compete for guest settings.
+- **This repository (the agent's setup):** reproducible guest setup and configuration synchronization. That covers packages and tools, OS maintenance, all user-level configuration (shell, terminal, desktop, theme, editor, applications), credential bootstrap from 1Password, Git, SSH, and GitHub access, runtime services, integrations, and safe resumption after a restore.
+- **Workspace repository:** the agent's persona, instructions, projects, and working material.
+- **Runtime state:** sessions, caches, databases, and working data stay outside this repository and follow their own backup and restore contract. Configuration synchronization does not back them up.
 
-Keep the default Omarchy environment where it already provides the needed capability. Extend its configuration without replacing unrelated shell setup or tool settings.
+1Password is the secrets authority. Git stores references to secrets, never their values.
 
-## Scope
+## Principles
 
-Keep only what serves the Omarchy fundamentals or their maintenance and validation. Remove support for macOS, Homebrew, WSL, and other Linux distributions. Do not install a second shell or duplicate Omarchy's desktop and shell conveniences just to preserve the previous dotfiles layout.
+- **One command, then converge.** On a fresh Omarchy account, `install.sh` applies the complete setup once identity and credentials are supplied. Reapplying is safe and leaves no drift.
+- **Everything declared.** Every tool, package, setting, and service the workstation relies on comes from this repository. Nothing on the workstation should need manual installation or configuration to be restored.
+- **Build on Omarchy.** Use Omarchy's package conventions and its supported commands where they exist (for example, its theme and font setters). Manage files this repository owns outright. Extend files that Omarchy or other tools also write, so their updates keep working.
+- **Full guest authority.** The agent administers its own VM, including system packages and services. Installs declared here run through the package manager, not ad hoc.
+- **Scoped credentials.** Tokens reach only the process that needs them. Nothing secret is committed.
+- **Fail clearly.** Required steps succeed or stop with an actionable error; no silent skips or protocol fallbacks.
+- **Safe resumption.** When managed services exist, a restored workstation starts with outbound automation paused until pending work has been checked against external services.
 
-The core bootstrap must not require OpenClaw, Codex, Claude, Node.js for those CLIs, Telegram credentials, a particular workspace repository, or a harness-specific directory. Harness selection and integration are deferred; no optional-harness framework is needed now.
+## Delivery
 
-Keep credentials out of Git and volatile runtime state outside chezmoi management. Use simple prerequisite checks and clear failures rather than silent skips or protocol fallbacks.
+The setup arrives in increments, each validated on a disposable Omarchy VM before it is relied on. `README.md` and `ARCHITECTURE.md` describe what is implemented today; the ignored local `PLAN.md` (when present) tracks sequencing and evidence.
 
 ## Success criteria
 
-- A human can prepare the intended Omarchy account with minimal manual work.
-- Bash exposes the documented credential and chezmoi commands without exporting the service-account token into the parent shell.
-- The account can authenticate to GitHub over SSH and produce a verifiable signed Git commit.
-- Reapply preserves Omarchy configuration and produces no managed-file drift.
-- The narrow, documented recovery paths work.
-- The result requires no choice of agent harness.
-
-The implementation sequence and outstanding evidence are in the ignored local `PLAN.md` (when present).
+- A clean Omarchy VM, one command, and the agent's credentials produce the complete working workstation with no manual steps.
+- Reapply converges with no managed-file drift and without breaking Omarchy's own updates.
+- Credentials stay scoped; the service-account token never enters the parent shell environment.
+- The agent can use Git, SSH, and GitHub as itself and produce verifiable signed commits.
+- After a loss, handing a clean VM to this repository reproduces the setup; required runtime state is restored separately.
