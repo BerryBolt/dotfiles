@@ -9,7 +9,7 @@ Operational rules for the Omarchy user environment.
 | What                   | Source of truth                                 |
 | ---------------------- | ----------------------------------------------- |
 | Secrets                | 1Password                                       |
-| System packages        | Omarchy base; additions declared in this repo (not implemented yet) |
+| System packages        | Omarchy base; additions in `home/.chezmoiscripts/run_once_after_40-install-system-packages.sh` |
 | Bootstrap CLI tools    | `~/.config/mise/conf.d/dotfiles.toml` (from `home/dot_config/mise/conf.d/`) |
 | Dotfiles               | chezmoi source (`~/.local/share/chezmoi/home/`) |
 | Policies               | This directory                                  |

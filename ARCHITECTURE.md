@@ -15,7 +15,7 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; system packages; agent CLIs; services; integrations; and safe resumption belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; agent CLIs; services; integrations; and safe resumption belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
@@ -29,7 +29,7 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 
 ## Bootstrap flow
 
-1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything; it never installs system packages.
+1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything. The installer itself never installs system packages; apply script 40 does, once sudo is passwordless.
 2. **Inputs.** It collects the account name, email, GitHub handle, vault, SSH key item, workstation account item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
 3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, the SSH key item is readable, and the workstation account item names the installing account. While sudo still asks for a password, it also checks the item's password against sudo. Bad credentials fail here, before any configuration is written.
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
@@ -52,6 +52,7 @@ The current implementation does not yet install agent CLIs, start services, or c
 | Script 10 | `run_once_after_10-install-mise-tools.sh.tmpl` | Installs the tools named in the manifest (read at render time); reruns when the manifest hash changes. |
 | Script 20 | `run_after_20-passwordless-sudo.sh.tmpl` | Ensures `/etc/sudoers.d/05-dotfiles-nopasswd` (root:root 0440) grants the account `NOPASSWD: ALL`. While sudo still asks for a password, it pipes the `op_account_item` password to `sudo -S` to install the rule, validating it with `visudo` before it takes effect. It fails if sudo still needs a password afterwards. The file sorts after the installer's per-user rule and before Omarchy's narrower rules. |
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
+| Script 40 | `run_once_after_40-install-system-packages.sh` | Installs system packages with Omarchy's commands: Brave through `omarchy-install-browser` (AUR, Omarchy's flags and theme policy), then makes it the default browser. Reruns when the script changes. |
 
 In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are available. Omarchy puts `~/.local/bin` and the mise shims on `PATH` for login and SSH shells; both wrappers also prepend those directories themselves for stripped-`PATH` callers. Non-interactive callers use `with-op op ...` because the `op()` function exists only in interactive shells.
 

@@ -93,6 +93,9 @@ check "sudoers rule grants this account NOPASSWD: ALL" \
 check "sudoers configuration is valid" sudo -n visudo -c
 
 echo "Tools"
+check "Brave is installed" pacman -Q brave-bin
+check "Brave is the default browser" \
+  test "$(env -u BROWSER xdg-settings get default-web-browser)" = brave-browser.desktop
 check "chezmoi resolves through mise" chezmoi --version
 check "op resolves through mise" op --version
 check "dotfiles mise manifest is active" \

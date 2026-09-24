@@ -9,9 +9,10 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 | Omarchy base | Omarchy installation | Bash and its init, Git, OpenSSH, curl, mise, desktop and shell defaults |
 | Omarchy on-demand tools | Omarchy's `~/.local/bin` launchers | `gh`, codex, claude, copilot, and others; installed through mise on first use |
 | User-level tools Omarchy lacks | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`) |
-| System packages | This repo, through pacman (not implemented yet) | Packages the workstation needs beyond Omarchy's base |
+| System packages | This repo: `run_once_after_40-install-system-packages.sh`, through Omarchy's package commands | Brave (AUR, with `omarchy-install-browser`) |
 
-- Everything the workstation needs MUST be declared in this repo and installed by apply or `install.sh`; nothing is installed by hand. The agent has full administrative rights in its VM, and setup grants its account passwordless sudo (ARCHITECTURE.md, script 20), so system packages are in scope; declare them and install them with pacman when that increment lands.
+- Everything the workstation needs MUST be declared in this repo and installed by apply or `install.sh`; nothing is installed by hand. The agent has full administrative rights in its VM, and setup grants its account passwordless sudo (ARCHITECTURE.md, script 20), so apply script 40 installs system packages unattended.
+- Install system packages with Omarchy's commands where one exists (`omarchy-install-browser`, `omarchy-pkg-add` for Arch repositories, `omarchy-pkg-aur-add` for the AUR). They skip what is already installed and apply Omarchy's settings for the package.
 - Go default first: if Omarchy provides a tool, including through an on-demand launcher, use Omarchy's route and do not declare the tool here.
 - For tools Omarchy lacks, prefer user-level installs through mise; use pacman for what needs the system package manager.
 - MUST NOT duplicate a tool Omarchy already provides.
