@@ -11,7 +11,7 @@ REVISION="${DOTFILES_REVISION:-}"
 SOURCE_DIR="$HOME/.local/share/chezmoi"
 
 # User-level tools this repo adds through mise. Keep in sync with
-# home/dot_config/mise/conf.d/dotfiles.toml (tests/regression.sh checks this).
+# home/dot_config/mise/conf.d/dotfiles.toml and apply script 10.
 BOOTSTRAP_TOOLS=(chezmoi@latest 1password-cli@latest)
 
 # System prerequisites supplied by Omarchy. The installer checks them and
@@ -529,10 +529,6 @@ bootstrap_main() {
   echo "    Re-run behavior and recovery scope: ARCHITECTURE.md#recovery."
   echo ""
 }
-
-# Detect whether we are being sourced as a library (e.g. from tests/regression.sh).
-# When sourced, stop here — callers reuse the helper functions and bootstrap_main.
-(return 0 2>/dev/null) && return 0
 
 parse_cli_args "$@"
 

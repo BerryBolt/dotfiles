@@ -66,6 +66,7 @@ An ignored local `PLAN.md` may track implementation of that vision; public docum
 - Runtime capability setup is deferred to the future harness or workspace setup.
 - Use `policies/git.md` for repo workflow.
 - Prefer simple, load-bearing bootstrap paths over defensive fallbacks. When a dependency or invariant is required for correct operation, do not add best-effort continuations, silent skips, placeholder recovery, or alternate protocol fallbacks just to keep going; fail fast with a clear error instead. If a flow is intentionally recoverable or best-effort, that exception must be documented explicitly in the architecture or runbook that owns it.
+- Do not create unit tests, fixture suites, or mocks. Validate on the disposable Omarchy VM with `tests/assertions.sh` and `tests/recovery.sh` against the pushed SHA.
 - Keep secrets out of git.
 - Keep volatile runtime state out of git.
 - Keep docs here generic to bootstrap and operations. If a doc is mainly about one agent's runtime behavior, it probably belongs in that agent's workspace repo.

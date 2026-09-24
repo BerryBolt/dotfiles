@@ -17,7 +17,7 @@ What the Omarchy workstation supplies and what this repo adds on top.
 
 ## Bootstrap tools manifest
 
-The manifest source is [home/dot_config/mise/conf.d/dotfiles.toml](../home/dot_config/mise/conf.d/dotfiles.toml). Three places must agree, and `tests/regression.sh` checks them:
+The manifest source is [home/dot_config/mise/conf.d/dotfiles.toml](../home/dot_config/mise/conf.d/dotfiles.toml). Three places must agree:
 
 1. The manifest itself.
 2. `BOOTSTRAP_TOOLS` in `install.sh`, which installs the tools before the first apply (chezmoi and `op` are needed to render templates).

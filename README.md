@@ -75,11 +75,10 @@ Omarchy remains responsible for its desktop, shell defaults, and existing tools.
 | `policies/` | Configuration, credential, dependency, and Git rules |
 | `runbooks/` | Operational procedures |
 | `skills/` | Bootstrap procedures |
-| `tests/` | Local regression checks, target-side fundamentals assertions, and recovery acceptance |
+| `tests/` | Acceptance checks run on the installed Omarchy account |
 
 ## Validation
 
-- `tests/regression.sh` — run on a development host. It needs `bash`, `git`, `ssh-keygen`, and `chezmoi`, but no credentials. It applies into a throwaway home and never touches the real one.
 - `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL` and `CHEZMOI_AGENT_HANDLE_GITHUB` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes.
 - `tests/recovery.sh` — **destructive; disposable or test accounts only.** It deletes and restores the SSH key and the credential env file, and simulates a rotated key with a generated fixture key. It reads the token from stdin for the env-file restore. The live 1Password item and GitHub registration are not changed.
 

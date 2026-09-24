@@ -4,7 +4,7 @@ Version control practices for this public dotfiles repository.
 
 ## Atomic commits
 
-- Each commit MUST contain one coherent change, with the tests and documentation needed to explain and validate it.
+- Each commit MUST contain one coherent change, with the documentation needed to explain it.
 - Group interdependent files by observable behavior, not by file type. Do not split a change so that a commit depends on uncommitted work to function.
 - Review the full staged and unstaged delta before committing. Existing staging is not an approved commit boundary; reorganize it without discarding file contents.
 - Avoid WIP dumps and unrelated changes in one commit. A change spanning many files can still be atomic when it produces one outcome.
@@ -33,7 +33,8 @@ feat: install a selected dotfiles revision from GitHub
 
 Commit and push directly to `main` on [BerryBolt/dotfiles](https://github.com/BerryBolt/dotfiles); do not create implementation or candidate branches. `https://berrybolt.bot/install.sh` redirects to `install.sh` on `main`, so every push to `main` is immediately the published installer.
 
-- Push only commits that pass the local checks (`tests/regression.sh`, `shellcheck`, the private-data review below). Push with plain fast-forwards.
+- Push only commits that pass the local checks (`shellcheck`, `bash -n` on rendered scripts, the private-data review below). Push with plain fast-forwards.
+- Do not add unit tests, fixture suites, or mocked environments (fake `op`, throwaway homes). Validate behavior on the disposable Omarchy VM with `tests/assertions.sh` and `tests/recovery.sh` against the pushed SHA.
 - Validate on the disposable VM after pushing: install from `raw.githubusercontent.com/BerryBolt/dotfiles/<full-sha>/install.sh` with `--revision <full-sha>`, so the installer and chezmoi source are the same pushed commit. Follow the ignored local `PLAN.md` (when present) for the exact sequence and target.
 - Commit and push fixes as new commits. Reset the disposable VM test setup before each fresh-install attempt until installation passes; then complete the broader checks and final acceptance run.
 - Record test evidence without real credentials or secret-bearing logs. Mark unperformed tests explicitly.
@@ -56,7 +57,7 @@ Checking out a commit that still tracked a now-ignored local file (such as `PLAN
 
 ## Tracked content
 
-Commit source templates, bootstrap scripts, required tests, policies, skills, and documentation belonging to the change.
+Commit source templates, bootstrap scripts, acceptance scripts, policies, skills, and documentation belonging to the change.
 
 Do not commit real secrets/tokens, SSH private keys, machine-local chezmoi configuration, credential env files, volatile runtime state, large binaries, or OS-generated files. Do not commit disposable login credentials, machine addresses, private infrastructure names/topology, private repository links, or live vault layouts. Keep these in ignored local inputs. Public keys and generic variable names are not secret; private keys and real access values are.
 
