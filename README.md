@@ -11,7 +11,7 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - An installed Omarchy workstation and the intended user account, provided by the platform owner. Run the installer as that user, not root.
 - Omarchy's default Bash, Git, OpenSSH, and mise. The installer checks for them and stops with an error if one is missing; it does not install system packages.
 - A 1Password service-account token scoped to the intended vault.
-- An SSH Key item named `id_ed25519` in that vault, with a valid OpenSSH private key and matching public key suitable for unattended use.
+- An SSH Key item in that vault, with a valid OpenSSH private key and matching public key suitable for unattended use. The installer selects it by title or item ID (`CHEZMOI_OP_SSH_ITEM`); an ID keeps working if the item is renamed. It is always installed as `~/.ssh/id_ed25519`, whatever the item is called.
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
@@ -24,14 +24,14 @@ No model provider, Telegram bot, agent runtime, or workspace repository is requi
 curl -fsSL https://berrybolt.bot/install.sh | bash
 ```
 
-The installer prompts for the account name, email, GitHub handle, vault, and token, then shows a review step. For an unattended run, set every input in the environment and pass `--non-interactive`. Keep the token inside a subshell, off the command line and out of shell history:
+The installer prompts for the account name, email, GitHub handle, vault, SSH key item, and token, then shows a review step. For an unattended run, set every input in the environment and pass `--non-interactive`. Keep the token inside a subshell, off the command line and out of shell history:
 
 ```bash
 (
   read -rsp 'Service account token: ' OP_SERVICE_ACCOUNT_TOKEN && echo
   export OP_SERVICE_ACCOUNT_TOKEN
   export CHEZMOI_AGENT_NAME="..." CHEZMOI_AGENT_EMAIL="..." \
-    CHEZMOI_AGENT_HANDLE_GITHUB="..." CHEZMOI_OP_VAULT="..."
+    CHEZMOI_AGENT_HANDLE_GITHUB="..." CHEZMOI_OP_VAULT="..." CHEZMOI_OP_SSH_ITEM="..."
   curl -fsSL https://berrybolt.bot/install.sh | bash -s -- --non-interactive
 )
 ```

@@ -53,10 +53,10 @@ The token is not stored in chezmoi data. Rotation goes through `install.sh`, whi
 
 ## Rotate the SSH signing key
 
-The `id_ed25519` SSH key is stored in 1Password and used both for signing git commits and for the chezmoi source repo's SSH remote. Rotation must update the 1Password item; every managed machine will pick up the new key on its next `chezmoi apply`.
+The SSH key is stored in the 1Password SSH Key item selected by chezmoi data `op_ssh_item` (title or item ID; see `chezmoi data`) and installed as `~/.ssh/id_ed25519`. It is used both for signing git commits and for the chezmoi source repo's SSH remote. Rotation must update that 1Password item; every managed machine will pick up the new key on its next `chezmoi-with-op apply`.
 
 1. Generate a new key pair locally (or let 1Password generate one).
-2. Update the `id_ed25519` item in `op://{op_vault}/id_ed25519`:
+2. Update the item at `op://{op_vault}/{op_ssh_item}`:
    - replace the `private key` field with the new private key
    - replace the `public key` field with the new public key
 3. Add the new public key to GitHub (or wherever it grants access) BEFORE continuing to step 4, so existing machines do not lock themselves out.

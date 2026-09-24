@@ -1,8 +1,8 @@
 #!/bin/bash
-# Ensure ~/.ssh/id_ed25519 matches the 1Password item and that the
-# chezmoi source remote uses SSH. Drift detection is load-bearing:
-# allowed_signers follows 1Password on every render, so a stale on-disk
-# key would make git sign with one key and verify with another.
+# Ensure ~/.ssh/id_ed25519 matches the 1Password SSH Key item selected by
+# op_ssh_item and that the chezmoi source remote uses SSH. Drift detection
+# is load-bearing: allowed_signers follows 1Password on every render, so a
+# stale on-disk key would make git sign with one key and verify with another.
 
 set -euo pipefail
 
@@ -12,6 +12,7 @@ SSH_DIR="$HOME/.ssh"
 SSH_KEY_NAME="id_ed25519"
 SSH_KEY="$SSH_DIR/$SSH_KEY_NAME"
 SSH_KEY_TMP="$SSH_KEY.tmp"
+OP_ITEM_REF="op://{{ .op_vault }}/{{ .op_ssh_item }}"
 REPO_DIR="$HOME/.local/share/chezmoi"
 PINNED_KNOWN_HOSTS="$HOME/.local/share/ssh-bootstrap/github_known_hosts"
 PINNED_FINGERPRINTS="$HOME/.local/share/ssh-bootstrap/github_known_hosts.sha256"
@@ -99,9 +100,9 @@ else
         echo "       Re-run install.sh or invoke chezmoi via chezmoi-with-op." >&2
         exit 1
     fi
-    if ! op_pub=$(op read "op://{{ .op_vault }}/$SSH_KEY_NAME/public key" 2>/dev/null); then
+    if ! op_pub=$(op read "$OP_ITEM_REF/public key" 2>/dev/null); then
         echo "Error: failed to read SSH public key from 1Password for validation." >&2
-        echo "       Expected: op://{{ .op_vault }}/$SSH_KEY_NAME/public key" >&2
+        echo "       Expected: $OP_ITEM_REF/public key" >&2
         exit 1
     fi
     local_pub=$(ssh-keygen -y -f "$SSH_KEY" 2>/dev/null || true)
@@ -109,7 +110,7 @@ else
     op_pub_norm=$(normalize_pubkey "$op_pub")
 
     if [[ -z "$op_pub_norm" ]]; then
-        echo "Error: 1Password returned an invalid public key for $SSH_KEY_NAME." >&2
+        echo "Error: 1Password returned an invalid public key for $OP_ITEM_REF." >&2
         exit 1
     fi
     if [[ -z "$local_pub_norm" ]]; then
@@ -141,10 +142,10 @@ if [[ "$need_restore" -eq 1 ]]; then
     chmod 700 "$SSH_DIR"
 
     # Force OpenSSH format; 1Password may otherwise return a format ssh-keygen rejects.
-    if ! op read "op://{{ .op_vault }}/$SSH_KEY_NAME/private key?ssh-format=openssh" > "$SSH_KEY_TMP"; then
+    if ! op read "$OP_ITEM_REF/private key?ssh-format=openssh" > "$SSH_KEY_TMP"; then
         rm -f "$SSH_KEY_TMP"
         echo "Error: missing required 1Password SSH key item." >&2
-        echo "       Expected: op://{{ .op_vault }}/$SSH_KEY_NAME (SSH Key, field 'private key')" >&2
+        echo "       Expected: $OP_ITEM_REF (SSH Key, field 'private key')" >&2
         exit 1
     fi
     chmod 600 "$SSH_KEY_TMP"

@@ -1,1 +1,1 @@
-{{ .agent_email }} {{ onepasswordRead (printf "op://%s/id_ed25519/public key" .op_vault) }}
+{{ .agent_email }} {{ onepasswordRead (printf "op://%s/%s/public key" .op_vault .op_ssh_item) }}

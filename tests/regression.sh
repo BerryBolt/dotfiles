@@ -45,7 +45,8 @@ pub_of() {
 # --- Fixtures -----------------------------------------------------------------
 
 VAULT="Fixture Vault"
-ITEM="id_ed25519"
+# A non-default item ID proves no consumer still assumes the id_ed25519 title.
+ITEM="fixtureitemid0123456789abc"
 EMAIL="agent@example.com"
 
 mkdir -p "$WORK/fakebin" "$WORK/op"
@@ -127,7 +128,7 @@ INIT_ENV="CHEZMOI_AGENT_NAME=Fixture Agent"
 init_apply() {
   local h=$1
   in_home "$h" env "$INIT_ENV" CHEZMOI_AGENT_EMAIL="$EMAIL" CHEZMOI_AGENT_HANDLE_GITHUB=example \
-    CHEZMOI_OP_VAULT="$VAULT" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one \
+    CHEZMOI_OP_VAULT="$VAULT" CHEZMOI_OP_SSH_ITEM="$ITEM" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one \
     chezmoi init --apply --no-tty --exclude=scripts </dev/null
 }
 
@@ -159,7 +160,7 @@ noninteractive_requires_inputs() {
     return 1
   fi
   case $out in
-    *"CHEZMOI_AGENT_NAME CHEZMOI_AGENT_EMAIL CHEZMOI_AGENT_HANDLE_GITHUB CHEZMOI_OP_VAULT OP_SERVICE_ACCOUNT_TOKEN"*) ;;
+    *"CHEZMOI_AGENT_NAME CHEZMOI_AGENT_EMAIL CHEZMOI_AGENT_HANDLE_GITHUB CHEZMOI_OP_VAULT CHEZMOI_OP_SSH_ITEM OP_SERVICE_ACCOUNT_TOKEN"*) ;;
     *) return 1 ;;
   esac
 }
@@ -190,17 +191,18 @@ serve_key a
 config_renders_without_prompt() {
   local out
   out=$(in_home "$H" env "$INIT_ENV" CHEZMOI_AGENT_EMAIL="$EMAIL" CHEZMOI_AGENT_HANDLE_GITHUB=example \
-    CHEZMOI_OP_VAULT="$VAULT" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one \
+    CHEZMOI_OP_VAULT="$VAULT" CHEZMOI_OP_SSH_ITEM="$ITEM" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one \
     chezmoi execute-template --init --no-tty --stdinisatty=false \
     --file "$SRC/home/.chezmoi.toml.tmpl" </dev/null 2>&1) || return 1
   case $out in *"op_vault = \"$VAULT\""*) ;; *) return 1 ;; esac
+  case $out in *"op_ssh_item = \"$ITEM\""*) ;; *) return 1 ;; esac
   case $out in *ai_cli* | *agent_workspace_repo* | *ops_fixture*) return 1 ;; esac
 }
 check "config template renders from env inputs with no prompt or token" config_renders_without_prompt
 
 config_requires_token() {
   ! in_home "$H" env "$INIT_ENV" CHEZMOI_AGENT_EMAIL="$EMAIL" CHEZMOI_AGENT_HANDLE_GITHUB=example \
-    CHEZMOI_OP_VAULT="$VAULT" chezmoi execute-template --init --no-tty --stdinisatty=false \
+    CHEZMOI_OP_VAULT="$VAULT" CHEZMOI_OP_SSH_ITEM="$ITEM" chezmoi execute-template --init --no-tty --stdinisatty=false \
     --file "$SRC/home/.chezmoi.toml.tmpl" </dev/null
 }
 check "config template fails without OP_SERVICE_ACCOUNT_TOKEN" config_requires_token
@@ -333,6 +335,14 @@ rotated_key_adopted() {
     [ "$(pub_of "$stale")" = "$(awk '{print $1, $2}' "$WORK/key-a.pub")" ]
 }
 check "rotated key replaces the old key and keeps it as .stale" rotated_key_adopted
+
+only_selected_item_read() {
+  # Both consumers (allowed_signers and script 30) read the selected item.
+  grep -q "^op://$VAULT/$ITEM/public key$" "$WORK/op/requests" &&
+    grep -q "^op://$VAULT/$ITEM/private key" "$WORK/op/requests" &&
+    ! grep -v "^op://$VAULT/$ITEM/" "$WORK/op/requests"
+}
+check "1Password reads use only the configured SSH item" only_selected_item_read
 
 restore_requires_token() {
   local out

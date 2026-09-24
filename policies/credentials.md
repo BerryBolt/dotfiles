@@ -119,13 +119,14 @@ MUST use the correct category. MUST NOT use generic categories like `Password` o
 | Login | `<Service>` | `GitHub`, `Brave`, `Notion` |
 | API key | `<Service> - API key` | `Brave Search - API key`, `Firecrawl - API key` |
 | Credential file | `<Service> - Credential File` | `Google Cloud - Credential File` |
-| SSH key | `<key filename>` | `id_ed25519` |
+| SSH key | `<key filename>` | `id_ed25519` (new items) |
 
 Rules:
 - MUST use regular hyphen (` - `), MUST NOT use em-dash (`—`)
 - MUST NOT include "Login" suffix in login item titles
 - MUST NOT include "API key" in login items (separate item)
 - Service name MUST match official name (e.g., `GitHub` not `Github` or `github`)
+- The bootstrap selects its SSH Key item through the `op_ssh_item` chezmoi value (title or item ID), not by the naming convention. Prefer the item ID there so renaming the item cannot break key restoration.
 
 ### Item structure (mandatory)
 

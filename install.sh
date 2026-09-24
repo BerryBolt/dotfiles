@@ -27,6 +27,7 @@ Env overrides:
   CHEZMOI_AGENT_EMAIL=...
   CHEZMOI_AGENT_HANDLE_GITHUB=...
   CHEZMOI_OP_VAULT=...
+  CHEZMOI_OP_SSH_ITEM=...   # SSH Key item title or ID in that vault
   OP_SERVICE_ACCOUNT_TOKEN=...
 
 Optional:
@@ -231,6 +232,7 @@ review_and_edit() {
     echo "    Agent email: $AGENT_EMAIL"
     echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
     echo "    1Password vault: $OP_VAULT"
+    echo "    1Password SSH key item: $OP_SSH_ITEM"
     if ! is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
       echo "    Token: set ($tail)"
@@ -244,8 +246,9 @@ review_and_edit() {
     echo "    3) Edit agent email"
     echo "    4) Edit GitHub handle"
     echo "    5) Edit 1Password vault"
-    echo "    6) Edit token"
-    printf "    Enter choice [1-6]: "
+    echo "    6) Edit 1Password SSH key item"
+    echo "    7) Edit token"
+    printf "    Enter choice [1-7]: "
     read -r selection < "$TTY_DEV" || abort
     case "$selection" in
       1|"")
@@ -274,6 +277,10 @@ review_and_edit() {
         OP_VAULT=$PROMPT_VALUE
         ;;
       6)
+        prompt_string "1Password SSH key item (title or ID)" "id_ed25519" "$OP_SSH_ITEM"
+        OP_SSH_ITEM=$PROMPT_VALUE
+        ;;
+      7)
         prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
         OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
         ;;
@@ -290,6 +297,7 @@ missing_inputs() {
   is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
   is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
   is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
+  is_blank "$OP_SSH_ITEM" && missing="$missing CHEZMOI_OP_SSH_ITEM"
   is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && missing="$missing OP_SERVICE_ACCOUNT_TOKEN"
   printf '%s' "$missing"
 }
@@ -299,6 +307,7 @@ collect_inputs() {
   AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
   AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
   OP_VAULT="${CHEZMOI_OP_VAULT:-}"
+  OP_SSH_ITEM="${CHEZMOI_OP_SSH_ITEM:-}"
   OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "${OP_SERVICE_ACCOUNT_TOKEN:-}")
   case "$OP_SERVICE_ACCOUNT_TOKEN" in
     ops_*|"") ;;
@@ -342,6 +351,10 @@ Tip: curl -fsSL $SCRIPT_URL | bash"
       prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
       OP_VAULT=$PROMPT_VALUE
     fi
+    if is_blank "$OP_SSH_ITEM"; then
+      prompt_string "1Password SSH key item (title or ID)" "id_ed25519" "$OP_SSH_ITEM"
+      OP_SSH_ITEM=$PROMPT_VALUE
+    fi
     if is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       echo "    See: https://github.com/${AGENT_HANDLE_GITHUB}/dotfiles/blob/main/skills/1password-setup/SKILL.md"
       echo ""
@@ -381,8 +394,8 @@ verify_credentials() {
   if ! with_bootstrap_tools op vault get "$OP_VAULT" >/dev/null 2>&1; then
     log_error "The service account cannot access 1Password vault: $OP_VAULT"
   fi
-  if ! with_bootstrap_tools op read "op://$OP_VAULT/id_ed25519/public key" >/dev/null 2>&1; then
-    log_error "Cannot read the SSH key item: op://$OP_VAULT/id_ed25519 (SSH Key with 'public key' and 'private key')"
+  if ! with_bootstrap_tools op read "op://$OP_VAULT/$OP_SSH_ITEM/public key" >/dev/null 2>&1; then
+    log_error "Cannot read the SSH key item: op://$OP_VAULT/$OP_SSH_ITEM (SSH Key with 'public key' and 'private key'). Check CHEZMOI_OP_SSH_ITEM."
   fi
 }
 
@@ -440,6 +453,7 @@ bootstrap_main() {
   export CHEZMOI_AGENT_EMAIL="$AGENT_EMAIL"
   export CHEZMOI_AGENT_HANDLE_GITHUB="$AGENT_HANDLE_GITHUB"
   export CHEZMOI_OP_VAULT="$OP_VAULT"
+  export CHEZMOI_OP_SSH_ITEM="$OP_SSH_ITEM"
   export OP_SERVICE_ACCOUNT_TOKEN
 
   install_bootstrap_tools

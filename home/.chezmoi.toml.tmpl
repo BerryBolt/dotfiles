@@ -2,6 +2,8 @@
 {{- $agent_email := or (env "CHEZMOI_AGENT_EMAIL") (promptStringOnce . "agent_email" "Agent email") -}}
 {{- $agent_handle_github := or (env "CHEZMOI_AGENT_HANDLE_GITHUB") (promptStringOnce . "agent_handle_github" "GitHub handle (e.g., BerryBolt)") -}}
 {{- $op_vault := or (env "CHEZMOI_OP_VAULT") (promptStringOnce . "op_vault" "1Password vault name") -}}
+{{- /* SSH Key item (title or ID) in that vault; independent of ~/.ssh/id_ed25519. */ -}}
+{{- $op_ssh_item := or (env "CHEZMOI_OP_SSH_ITEM") (promptStringOnce . "op_ssh_item" "1Password SSH key item (title or ID)") -}}
 {{- /* Token is read from env by private_env.tmpl, never persisted in [data]. */ -}}
 {{- if eq (env "OP_SERVICE_ACCOUNT_TOKEN") "" -}}
 {{- fail "OP_SERVICE_ACCOUNT_TOKEN must be set in env. Bootstrap via install.sh — it is the only supported entry point." -}}
@@ -12,6 +14,7 @@
   agent_email = {{ $agent_email | quote }}
   agent_handle_github = {{ $agent_handle_github | quote }}
   op_vault = {{ $op_vault | quote }}
+  op_ssh_item = {{ $op_ssh_item | quote }}
 
 [onepassword]
   mode = "service"
