@@ -72,6 +72,8 @@ check "interactive Bash does not export the token" \
   interactive '[[ -z ${OP_SERVICE_ACCOUNT_TOKEN:-} ]] && ! env | grep -q "^OP_SERVICE_ACCOUNT_TOKEN="'
 check "op whoami reports a service account from a terminal" \
   interactive 'op whoami | grep -q "\"SERVICE_ACCOUNT\""'
+check "login shells find chezmoi-with-op, with-op, and chezmoi" \
+  env -i HOME="$HOME" PATH=/usr/bin:/bin bash -lc 'command -v chezmoi-with-op && command -v with-op && command -v chezmoi'
 check "with-op works for non-interactive callers" \
   env -i HOME="$HOME" PATH=/usr/bin:/bin "$HOME/.local/bin/with-op" bash -c 'op vault get "$OP_VAULT" >/dev/null'
 
@@ -111,7 +113,8 @@ check "~/.ssh/id_ed25519 is 600" mode_is "$HOME/.ssh/id_ed25519" 600
 check "allowed_signers matches the on-disk key" \
   test "$(awk '{print $1, $2, $3}' "$HOME/.config/git/allowed_signers")" = \
   "$CHEZMOI_AGENT_EMAIL $(pub_of_key "$HOME/.ssh/id_ed25519")"
-check "~/.ssh/config is 600" mode_is "$HOME/.ssh/config" 600
+check "~/.ssh/config is 600 with exactly one dotfiles block" \
+  bash -c '[ "$(stat -c %a "$1")" = 600 ] && [ "$(grep -c "^# >>> dotfiles >>>$" "$1")" -eq 1 ]' _ "$HOME/.ssh/config"
 check "GitHub SSH goes to ssh.github.com:443 with pinned host keys" \
   bash -c 'g=$(ssh -G github.com) && grep -qx "hostname ssh.github.com" <<<"$g" && grep -qx "port 443" <<<"$g" && grep -qx "hostkeyalias github.com" <<<"$g"'
 check "known_hosts pins exactly the repo's GitHub keys" \

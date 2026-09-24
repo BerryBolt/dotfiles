@@ -81,7 +81,8 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 ## Validation
 
 - `tests/regression.sh` runs on a development host without credentials or a target machine. It applies the source into a throwaway home with a fake `op` and fixture keys and checks unattended init, preservation of existing Bash and mise content, reapply drift, wrapper scoping, revision selection, and SSH restoration.
-- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration, credential scope and permissions, identity and local commit signing, key and host trust, and managed-file drift.
+- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), credential scope and permissions, identity and local commit signing, key and host trust, SSH source sync, and managed-file drift.
+- `tests/recovery.sh` runs on a disposable installed account. It proves the recovery paths above: a deleted key, a previous (fixture) key being replaced, and a deleted env file restored from a token supplied on stdin.
 
 Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository: the installer is downloaded from `raw.githubusercontent.com/.../<sha>/install.sh` and run with `--revision <sha>`, so the installer and the applied source are the same commit on fresh and repeat installs. Fixture success is not Omarchy or live-credential evidence. Machine access and private operational context stay in ignored local inputs.
 
