@@ -181,6 +181,76 @@ preflight_matches_host() {
 }
 check "preflight rejects hosts other than Omarchy" preflight_matches_host
 
+# --- Revision selection ---------------------------------------------------------
+
+echo "Revision selection"
+
+REV_REMOTE="$WORK/rev-remote.git"
+git init -q --bare "$REV_REMOTE"
+git clone -q "$REV_REMOTE" "$WORK/rev-seed" 2>/dev/null
+for n in 1 2; do
+  echo "$n" >"$WORK/rev-seed/file"
+  git -C "$WORK/rev-seed" add file
+  git -C "$WORK/rev-seed" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qm "c$n"
+done
+git -C "$WORK/rev-seed" push -q origin HEAD:refs/heads/main
+REV_OLD=$(git -C "$WORK/rev-seed" rev-parse HEAD~1)
+REV_HOME=$(mktemp -d "$WORK/rev-home.XXXXXX")
+REV_SRC="$REV_HOME/.local/share/chezmoi"
+
+# Run install.sh's argument parsing and source sync in REV_HOME; the
+# output lands in $WORK/rev-out for message checks.
+rev_sync() {
+  env -i HOME="$REV_HOME" PATH="$BASE_PATH" \
+    bash -c '. "$1"; repo=$2; shift 2; parse_cli_args "$@"; validate_revision; sync_source "$repo"' \
+    _ "$SRC/install.sh" "$REV_REMOTE" "$@" >"$WORK/rev-out" 2>&1
+}
+rev_out_has() {
+  grep -qF -- "$1" "$WORK/rev-out"
+}
+rev_head_is() {
+  [ "$(git -C "$REV_SRC" rev-parse HEAD)" = "$1" ]
+}
+
+short_sha_rejected() {
+  ! rev_sync --revision "$(printf '%.12s' "$REV_OLD")" && rev_out_has "full 40-character"
+}
+check "--revision rejects a short SHA" short_sha_rejected
+
+check "fresh install checks out the pinned non-tip revision" \
+  eval 'rev_sync --revision "$REV_OLD" && rev_head_is "$REV_OLD"'
+
+# Publish a commit the existing checkout has never seen.
+echo 3 >"$WORK/rev-seed/file"
+git -C "$WORK/rev-seed" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qam c3
+git -C "$WORK/rev-seed" push -q origin HEAD:refs/heads/main
+REV_TIP=$(git -C "$WORK/rev-seed" rev-parse HEAD)
+check "repeat install fetches and checks out a new pinned revision" \
+  eval 'rev_sync "--revision=$REV_TIP" && rev_out_has "Fetching revision" && rev_head_is "$REV_TIP"'
+
+detached_without_revision_fails() {
+  ! rev_sync && rev_out_has "detached" && rev_head_is "$REV_TIP"
+}
+check "repeat install without --revision refuses a detached source" detached_without_revision_fails
+
+unknown_revision_fails() {
+  ! rev_sync --revision 0000000000000000000000000000000000000001 &&
+    rev_out_has "Cannot fetch revision" && rev_head_is "$REV_TIP"
+}
+check "an unavailable revision fails clearly and leaves HEAD alone" unknown_revision_fails
+
+dirty_source_refused() {
+  echo local >>"$REV_SRC/file"
+  ! rev_sync --revision "$REV_OLD" && rev_out_has "local modifications" && rev_head_is "$REV_TIP"
+}
+check "a source with local modifications is refused" dirty_source_refused
+git -C "$REV_SRC" checkout -q -- file
+
+unknown_argument_fails() {
+  ! rev_sync --bogus && rev_out_has "Unknown argument: --bogus"
+}
+check "unknown installer arguments fail" unknown_argument_fails
+
 # --- Unattended init ------------------------------------------------------------
 
 echo "Unattended init"

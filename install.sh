@@ -7,6 +7,7 @@ set -euo pipefail
 
 SCRIPT_URL="https://berrybolt.bot/install.sh"
 NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
+REVISION="${DOTFILES_REVISION:-}"
 SOURCE_DIR="$HOME/.local/share/chezmoi"
 
 # User-level tools this repo adds through mise. Keep in sync with
@@ -33,12 +34,17 @@ Env overrides:
 Optional:
   CHEZMOI_NONINTERACTIVE=1  # disable prompts (requires all env vars)
   --non-interactive         # same as above
+  --revision <sha>          # apply this full 40-character commit SHA of the
+  DOTFILES_REVISION=<sha>   # source instead of the default branch; use the
+                            # same SHA as the installer URL when testing
+
+The source repository is https://github.com/<GitHub handle>/dotfiles.git.
 EOF
 }
 
 parse_cli_args() {
-  for arg in "$@"; do
-    case "$arg" in
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
       -h|--help)
         usage
         exit 0
@@ -46,11 +52,28 @@ parse_cli_args() {
       --non-interactive|--unattended)
         NONINTERACTIVE=1
         ;;
+      --revision)
+        [ "$#" -ge 2 ] || log_error "--revision requires a full commit SHA"
+        REVISION=$2
+        shift
+        ;;
+      --revision=*)
+        REVISION=${1#--revision=}
+        ;;
       *)
-        log_error "Unknown argument: $arg (see --help)"
+        log_error "Unknown argument: $1 (see --help)"
         ;;
     esac
+    shift
   done
+}
+
+# Only full SHAs: a branch, tag, or short SHA could resolve differently
+# between the installer download and the source fetch.
+validate_revision() {
+  if [ -n "$REVISION" ] && ! printf '%s' "$REVISION" | grep -Eq '^[0-9a-f]{40}$'; then
+    log_error "--revision must be a full 40-character lowercase commit SHA (got: $REVISION)"
+  fi
 }
 
 abort() {
@@ -399,6 +422,23 @@ verify_credentials() {
   fi
 }
 
+# Detach the source at $REVISION, fetching it from origin when it is not
+# already present, and prove HEAD landed there.
+checkout_revision() {
+  if ! git -C "$SOURCE_DIR" cat-file -e "$REVISION^{commit}" 2>/dev/null; then
+    log_info "Fetching revision $REVISION..."
+    if ! git -C "$SOURCE_DIR" fetch --quiet origin "$REVISION"; then
+      log_error "Cannot fetch revision $REVISION from origin. Push it first and pass the full SHA."
+    fi
+  fi
+  if ! git -C "$SOURCE_DIR" checkout --quiet --detach "$REVISION"; then
+    log_error "Cannot check out revision $REVISION."
+  fi
+  if [ "$(git -C "$SOURCE_DIR" rev-parse HEAD)" != "$REVISION" ]; then
+    log_error "Source is not at the requested revision $REVISION."
+  fi
+}
+
 # Clone the public source on first install. Afterwards, sync over the SSH
 # remote that the apply script configured; never fall back to HTTPS.
 sync_source() {
@@ -409,6 +449,9 @@ sync_source() {
     mkdir -p "$(dirname "$SOURCE_DIR")"
     if ! git clone --quiet "$repo" "$SOURCE_DIR"; then
       log_error "Failed to clone dotfiles source: $repo"
+    fi
+    if [ -n "$REVISION" ]; then
+      checkout_revision
     fi
     return
   fi
@@ -432,6 +475,18 @@ sync_source() {
       ;;
   esac
 
+  if [ -n "$(git -C "$SOURCE_DIR" status --porcelain)" ]; then
+    log_error "$SOURCE_DIR has local modifications. Commit and push or discard them, then re-run."
+  fi
+
+  if [ -n "$REVISION" ]; then
+    checkout_revision
+    return
+  fi
+
+  if ! git -C "$SOURCE_DIR" symbolic-ref -q HEAD >/dev/null; then
+    log_error "$SOURCE_DIR is detached at $(git -C "$SOURCE_DIR" rev-parse HEAD) from a pinned install. Re-run with --revision <sha>, or check out a branch."
+  fi
   log_info "Updating dotfiles source..."
   if ! git -C "$SOURCE_DIR" pull --ff-only --quiet; then
     log_error "git pull failed. SSH source sync must work before bootstrap can continue."
@@ -442,6 +497,7 @@ bootstrap_main() {
   repo=${1:-}
 
   preflight
+  validate_revision
   log_header
   collect_inputs
 
@@ -459,6 +515,7 @@ bootstrap_main() {
   install_bootstrap_tools
   verify_credentials
   sync_source "$repo"
+  log_info "Dotfiles source at $(git -C "$SOURCE_DIR" rev-parse HEAD)"
 
   log_info "Applying dotfiles..."
   if ! with_bootstrap_tools chezmoi init --apply; then

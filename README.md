@@ -38,6 +38,20 @@ The installer prompts for the account name, email, GitHub handle, vault, SSH key
 
 The published `berrybolt.bot` endpoint is managed outside this repository and may serve an earlier installer until this candidate is promoted.
 
+The source comes from `https://github.com/<GitHub handle>/dotfiles.git`, on its default branch unless you pin a revision.
+
+### Install an exact revision
+
+To test a pushed commit, fetch the installer and apply the source from the same full SHA:
+
+```bash
+sha=<full-40-character-commit-sha>
+curl -fsSL "https://raw.githubusercontent.com/BerryBolt/dotfiles/$sha/install.sh" \
+  | bash -s -- --revision "$sha"
+```
+
+`--revision` (or `DOTFILES_REVISION`) accepts only a full commit SHA. On a fresh install the installer clones the repository and detaches at that commit. On a repeat install it fetches the commit over the existing SSH remote when needed and detaches there. It stops if the commit cannot be fetched or the existing source has local modifications. A later run without `--revision` refuses a detached source instead of silently moving it.
+
 ## Result
 
 Open a normal Omarchy terminal:

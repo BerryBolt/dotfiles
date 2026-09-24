@@ -27,7 +27,7 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything; it never installs system packages.
 2. **Inputs.** It collects the account name, email, GitHub handle, vault, SSH key item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
 3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, and the SSH key item is readable. Bad credentials fail here, before any configuration is written.
-4. **Source.** On first install it clones the public source over HTTPS. On later runs it requires the SSH remote configured by the first apply and fast-forwards over SSH. It never falls back to HTTPS.
+4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 
 Bootstrap does not install agent CLIs, start an agent service, clone an agent workspace, select a model, or create a first-wake file.
@@ -79,10 +79,10 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Validation
 
-- `tests/regression.sh` runs on a development host without credentials or a target machine. It applies the source into a throwaway home with a fake `op` and fixture keys and checks unattended init, preservation of existing Bash and mise content, reapply drift, wrapper scoping, and SSH restoration.
+- `tests/regression.sh` runs on a development host without credentials or a target machine. It applies the source into a throwaway home with a fake `op` and fixture keys and checks unattended init, preservation of existing Bash and mise content, reapply drift, wrapper scoping, revision selection, and SSH restoration.
 - `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration, credential scope and permissions, identity and local commit signing, key and host trust, and managed-file drift.
 
-Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository. Fixture success is not Omarchy or live-credential evidence. Machine access and private operational context stay in ignored local inputs.
+Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository: the installer is downloaded from `raw.githubusercontent.com/.../<sha>/install.sh` and run with `--revision <sha>`, so the installer and the applied source are the same commit on fresh and repeat installs. Fixture success is not Omarchy or live-credential evidence. Machine access and private operational context stay in ignored local inputs.
 
 ## Invariants
 
