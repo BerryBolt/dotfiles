@@ -45,7 +45,7 @@ The current implementation does not yet install agent CLIs, start services, or c
 | `~/.local/bin/with-op` | `home/dot_local/bin/executable_with-op` | Runs one command with `~/.config/op/env` loaded into that process only. |
 | `~/.local/bin/chezmoi-with-op` | `home/dot_local/bin/executable_chezmoi-with-op` | Runs chezmoi with the token for template rendering: a token supplied in the caller's environment wins, otherwise `~/.config/op/env`; with neither it fails. |
 | `~/.config/op/env` | `home/dot_config/private_op/private_env.tmpl` | Token, vault, and `OP_FORMAT=json`; mode 0600 in a 0700 directory. `~/.config` keeps Omarchy's mode. |
-| `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares `chezmoi`, `1password-cli`, and `gh`. `~/.config/mise/config.toml` stays user-owned; declaring `gh` here means Omarchy's on-demand `gh` launcher never has to write it. |
+| `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares `chezmoi` and `1password-cli`, which Omarchy does not provide. `~/.config/mise/config.toml` stays user-owned. Tools Omarchy provides, such as `gh`, come from its on-demand launchers. |
 | `~/.gitconfig` | `home/dot_gitconfig.tmpl` | Identity and SSH commit/tag signing with `~/.ssh/id_ed25519`. Omarchy's `~/.config/git/config` still applies underneath. |
 | `~/.config/git/allowed_signers` | `home/dot_config/git/allowed_signers.tmpl` | Agent email and the public key of the `op_ssh_item` item. |
 | `~/.local/share/ssh-bootstrap/` | `home/dot_local/share/ssh-bootstrap/` | GitHub host keys and fingerprints pinned from GitHub's documentation. |

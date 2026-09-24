@@ -1,9 +1,9 @@
-# User-level tools added by the dotfiles repo. Omarchy supplies Git, OpenSSH,
-# and mise itself; other entries in ~/.config/mise/config.toml stay user-owned.
-# install.sh installs chezmoi and 1password-cli before the first apply; apply
-# script 10 installs every tool listed here.
+# User-level tools added by the dotfiles repo, only where Omarchy provides no
+# default (it supplies Git, OpenSSH, mise, and on-demand launchers such as gh).
+# Other entries in ~/.config/mise/config.toml stay user-owned. install.sh
+# installs these before the first apply; apply script 10 installs every tool
+# listed here.
 
 [tools]
 chezmoi = "latest"
 1password-cli = "latest"
-gh = "latest"
