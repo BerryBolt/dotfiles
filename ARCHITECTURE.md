@@ -43,6 +43,7 @@ Bootstrap does not install agent CLIs, start an agent service, clone an agent wo
 | `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares `chezmoi` and `1password-cli`. `~/.config/mise/config.toml` stays user-owned. |
 | `~/.gitconfig` | `home/dot_gitconfig.tmpl` | Identity and SSH commit/tag signing with `~/.ssh/id_ed25519`. Omarchy's `~/.config/git/config` still applies underneath. |
 | `~/.config/git/allowed_signers` | `home/dot_config/git/allowed_signers.tmpl` | Agent email and the public key of the `op_ssh_item` item. |
+| `~/.ssh/config` | `home/private_dot_ssh/modify_private_config` | Keeps the user's entries and maintains one marked block at the top that sends `github.com` SSH to `ssh.github.com:443` with `HostKeyAlias github.com` and the restored key only. File 0600, directory 0700. |
 | `~/.local/share/ssh-bootstrap/` | `home/dot_local/share/ssh-bootstrap/` | GitHub host keys and fingerprints pinned from GitHub's documentation. |
 | Script 10 | `run_once_after_10-install-mise-tools.sh.tmpl` | Installs the manifest's tools; reruns when the manifest hash changes. |
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
@@ -55,7 +56,7 @@ In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are availa
 
 Credential wrappers load the env only into the child process that needs it. Bash startup does not export the token into the parent shell. Rendering obtains the token from the invoking process; the templates reject an absent token rather than replace stored credentials with an empty value.
 
-Pinned GitHub host keys establish trust before authenticated Git operations. Git's allowed signers follow the public key from 1Password. Both key consumers resolve the same `op_ssh_item` selector; the local filename `~/.ssh/id_ed25519` does not depend on the item's title. Key restoration preserves the relationship between the signing key and allowed signers: chezmoi renders `allowed_signers` before the `run_after_` script aligns the private key.
+Pinned GitHub host keys establish trust before authenticated Git operations. GitHub SSH always uses GitHub's port-443 endpoint, which also works on networks that block outbound port 22. `HostKeyAlias github.com` keeps host key checks on the pinned `github.com` entries. This is the only route; there is no fallback to port 22 or HTTPS. Git's allowed signers follow the public key from 1Password. Both key consumers resolve the same `op_ssh_item` selector; the local filename `~/.ssh/id_ed25519` does not depend on the item's title. Key restoration preserves the relationship between the signing key and allowed signers: chezmoi renders `allowed_signers` before the `run_after_` script aligns the private key.
 
 ## Apply scripts
 

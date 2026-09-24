@@ -95,6 +95,11 @@ alias p='"'"'python'"'"'
 USER_MISE='[tools]
 node = "lts"
 '
+USER_SSH_CONFIG='ServerAliveInterval 17
+
+Host example.org
+  Port 2222
+'
 
 # Build a fake Omarchy home with the candidate source checked out at the
 # default location behind a GitHub HTTPS origin, as a fresh clone leaves it.
@@ -106,6 +111,8 @@ new_home() {
   chmod 755 "$h/.config"
   printf '%s' "$OMARCHY_BASHRC" >"$h/.bashrc"
   printf '%s' "$USER_MISE" >"$h/.config/mise/config.toml"
+  mkdir -m 755 "$h/.ssh"
+  printf '%s' "$USER_SSH_CONFIG" >"$h/.ssh/config"
   mkdir "$h/.local/share/chezmoi"
   (cd "$SRC" && tar cf - --exclude .git --exclude .local --exclude PLAN.md --exclude .env --exclude tests/.env.local .) |
     (cd "$h/.local/share/chezmoi" && tar xf -)
@@ -303,6 +310,20 @@ check "allowed_signers trusts the 1Password public key" \
   grep -qxF "$EMAIL $(awk '{print $1, $2}' "$WORK/key-a.pub")" <(awk '{print $1, $2, $3}' "$H/.config/git/allowed_signers")
 check "gitconfig signs with the restored key" grep -qF "signingkey = $H/.ssh/id_ed25519" "$H/.gitconfig"
 check "gitconfig has no gh credential helper" bash -c '! grep -q "gh auth" "$1"' _ "$H/.gitconfig"
+ssh_config_routes_github() {
+  local c="$H/.ssh/config" g
+  g=$(ssh -F "$c" -G github.com 2>/dev/null)
+  printf '%s\n' "$g" | grep -qx 'hostname ssh.github.com' &&
+    printf '%s\n' "$g" | grep -qx 'port 443' &&
+    printf '%s\n' "$g" | grep -qx 'hostkeyalias github.com' &&
+    ssh -F "$c" -G example.org 2>/dev/null | grep -qx 'port 2222' &&
+    ssh -F "$c" -G other.example 2>/dev/null | grep -qx 'serveraliveinterval 17'
+}
+check "~/.ssh/config routes GitHub through ssh.github.com:443" ssh_config_routes_github
+check "~/.ssh/config keeps the user's entries after the block" \
+  cmp -s <(tail -c "${#USER_SSH_CONFIG}" "$H/.ssh/config") <(printf '%s' "$USER_SSH_CONFIG")
+check "~/.ssh is 700 and ~/.ssh/config is 600" \
+  test "$(perm_of "$H/.ssh")/$(perm_of "$H/.ssh/config")" = 700/600
 check "with-op and chezmoi-with-op are executable" \
   test -x "$H/.local/bin/with-op" -a -x "$H/.local/bin/chezmoi-with-op"
 
@@ -310,7 +331,8 @@ reapply_is_clean() {
   in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one chezmoi verify --no-tty --exclude=scripts </dev/null &&
     in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one chezmoi apply --no-tty --exclude=scripts </dev/null &&
     in_home "$H" env OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_one chezmoi verify --no-tty --exclude=scripts </dev/null &&
-    [ "$(grep -c '^# >>> dotfiles >>>$' "$H/.bashrc")" -eq 1 ]
+    [ "$(grep -c '^# >>> dotfiles >>>$' "$H/.bashrc")" -eq 1 ] &&
+    [ "$(grep -c '^# >>> dotfiles >>>$' "$H/.ssh/config")" -eq 1 ]
 }
 check "reapply leaves no managed-file drift" reapply_is_clean
 
@@ -361,7 +383,6 @@ run_s30() {
 check "restore script renders and parses" bash -n "$S30"
 
 # Seed an unrelated host and a stale github.com entry (fixture keys).
-mkdir -p "$H/.ssh"
 {
   printf 'example.org %s\n' "$(awk '{print $1, $2}' "$WORK/key-a.pub")"
   printf 'github.com %s\n' "$(awk '{print $1, $2}' "$WORK/key-b.pub")"

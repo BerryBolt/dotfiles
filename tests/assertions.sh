@@ -37,7 +37,7 @@ check() {
     printf '  \033[0;32m✓\033[0m %s\n' "$desc"
     pass=$((pass + 1))
   else
-    printf '  \033[0;31m✗\033[0m %s\n' "$desc" >&2
+    printf '  \033[0;31m✗\033[0m %s\n' "$desc"
     fail=$((fail + 1))
   fi
 }
@@ -111,6 +111,9 @@ check "~/.ssh/id_ed25519 is 600" mode_is "$HOME/.ssh/id_ed25519" 600
 check "allowed_signers matches the on-disk key" \
   test "$(awk '{print $1, $2, $3}' "$HOME/.config/git/allowed_signers")" = \
   "$CHEZMOI_AGENT_EMAIL $(pub_of_key "$HOME/.ssh/id_ed25519")"
+check "~/.ssh/config is 600" mode_is "$HOME/.ssh/config" 600
+check "GitHub SSH goes to ssh.github.com:443 with pinned host keys" \
+  bash -c 'g=$(ssh -G github.com) && grep -qx "hostname ssh.github.com" <<<"$g" && grep -qx "port 443" <<<"$g" && grep -qx "hostkeyalias github.com" <<<"$g"'
 check "known_hosts pins exactly the repo's GitHub keys" \
   cmp -s <(grep '^github\.com ' "$HOME/.ssh/known_hosts") \
   <(grep '^github\.com ' "$HOME/.local/share/ssh-bootstrap/github_known_hosts")
@@ -127,6 +130,8 @@ check "chezmoi source has no local modifications" \
   test -z "$(git -C "$SOURCE_DIR" status --porcelain)"
 check "chezmoi source remote uses SSH" \
   bash -c 'git -C "$1" remote get-url origin | grep -q "^git@github.com:"' _ "$SOURCE_DIR"
+check "chezmoi source syncs over SSH (ls-remote origin)" \
+  env GIT_SSH_COMMAND="ssh -o BatchMode=yes" git -C "$SOURCE_DIR" ls-remote --exit-code origin HEAD
 if [ -n "${EXPECTED_REVISION:-}" ]; then
   check "chezmoi source is at $EXPECTED_REVISION" \
     test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$EXPECTED_REVISION"
