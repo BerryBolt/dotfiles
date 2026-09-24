@@ -19,6 +19,18 @@ The agent works like an employee with its own accounts: it signs up for services
 - The human owner administers the 1Password account and keeps the service-account token outside the agent's vault (see Vault rules).
 - Service-account permissions are fixed at creation. To change vaults or permissions, create a replacement service account and [rotate the token](../runbooks/1password-service-account.md#rotate-the-token).
 
+### Runtime sign-ins
+
+CLIs with their own OAuth sign-in keep that session as runtime state, not configuration. The repo installs them; the agent signs in itself and signs in again after a restore:
+
+| CLI | Sign-in | Session stored in |
+| --- | --- | --- |
+| `gh` | `gh auth login --web` | `~/.config/gh/` |
+| `wrangler` | `wrangler login` | `~/.config/.wrangler/` |
+| `xurl` | `xurl auth oauth2 --headless`, with the developer app's client ID and secret from 1Password in the environment | `~/.xurl` (refresh tokens rotate on every use) |
+
+The agent MUST NOT print or read these session files or tokens into its own context.
+
 ## Environment setup
 
 Required environment variables for `op`:
