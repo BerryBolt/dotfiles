@@ -31,7 +31,7 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 
 1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything; it never installs system packages.
 2. **Inputs.** It collects the account name, email, GitHub handle, vault, SSH key item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
-3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, and the SSH key item is readable. Bad credentials fail here, before any configuration is written.
+3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, and the SSH key item is readable. Bad credentials fail here, before any configuration is written.
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 
@@ -45,11 +45,11 @@ The current implementation does not yet install agent CLIs, start services, or c
 | `~/.local/bin/with-op` | `home/dot_local/bin/executable_with-op` | Runs one command with `~/.config/op/env` loaded into that process only. |
 | `~/.local/bin/chezmoi-with-op` | `home/dot_local/bin/executable_chezmoi-with-op` | Runs chezmoi with the token for template rendering: a token supplied in the caller's environment wins, otherwise `~/.config/op/env`; with neither it fails. |
 | `~/.config/op/env` | `home/dot_config/private_op/private_env.tmpl` | Token, vault, and `OP_FORMAT=json`; mode 0600 in a 0700 directory. `~/.config` keeps Omarchy's mode. |
-| `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares `chezmoi` and `1password-cli`. `~/.config/mise/config.toml` stays user-owned. |
+| `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares `chezmoi`, `1password-cli`, and `gh`. `~/.config/mise/config.toml` stays user-owned; declaring `gh` here means Omarchy's on-demand `gh` launcher never has to write it. |
 | `~/.gitconfig` | `home/dot_gitconfig.tmpl` | Identity and SSH commit/tag signing with `~/.ssh/id_ed25519`. Omarchy's `~/.config/git/config` still applies underneath. |
 | `~/.config/git/allowed_signers` | `home/dot_config/git/allowed_signers.tmpl` | Agent email and the public key of the `op_ssh_item` item. |
 | `~/.local/share/ssh-bootstrap/` | `home/dot_local/share/ssh-bootstrap/` | GitHub host keys and fingerprints pinned from GitHub's documentation. |
-| Script 10 | `run_once_after_10-install-mise-tools.sh.tmpl` | Installs the manifest's tools; reruns when the manifest hash changes. |
+| Script 10 | `run_once_after_10-install-mise-tools.sh.tmpl` | Installs the tools named in the manifest (read at render time); reruns when the manifest hash changes. |
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
 
 In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are available. Omarchy puts `~/.local/bin` and the mise shims on `PATH` for login and SSH shells; both wrappers also prepend those directories themselves for stripped-`PATH` callers. Non-interactive callers use `with-op op ...` because the `op()` function exists only in interactive shells.

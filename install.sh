@@ -10,8 +10,8 @@ NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
 REVISION="${DOTFILES_REVISION:-}"
 SOURCE_DIR="$HOME/.local/share/chezmoi"
 
-# User-level tools this repo adds through mise. Keep in sync with
-# home/dot_config/mise/conf.d/dotfiles.toml and apply script 10.
+# Tools the first apply needs (templates call op). They must also be listed
+# in home/dot_config/mise/conf.d/dotfiles.toml, which apply script 10 installs.
 BOOTSTRAP_TOOLS=(chezmoi@latest 1password-cli@latest)
 
 # System prerequisites supplied by Omarchy. The installer checks them and

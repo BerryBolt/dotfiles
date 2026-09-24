@@ -86,6 +86,8 @@ check "chezmoi config does not persist the token" \
 echo "Tools"
 check "chezmoi resolves through mise" chezmoi --version
 check "op resolves through mise" op --version
+check "gh resolves through the mise manifest" \
+  bash -c 'gh --version >/dev/null && case "$(mise which gh)" in "$HOME"/.local/share/mise/installs/gh/*) true ;; *) false ;; esac' 
 check "dotfiles mise manifest is active" \
   bash -c 'mise config ls | grep -q "conf.d/dotfiles.toml"'
 

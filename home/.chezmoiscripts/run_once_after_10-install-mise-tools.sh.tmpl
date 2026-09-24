@@ -1,11 +1,12 @@
 #!/bin/bash
-# Install the bootstrap tools declared in ~/.config/mise/conf.d/dotfiles.toml.
+# Install the tools declared in ~/.config/mise/conf.d/dotfiles.toml.
 # The sha below ties this run_once script's hash to the manifest so
 # edits propagate; see ARCHITECTURE.md "Apply scripts".
 # mise-manifest-sha: {{ include "dot_config/mise/conf.d/dotfiles.toml" | sha256sum }}
+{{- $tools := (include "dot_config/mise/conf.d/dotfiles.toml" | fromToml).tools }}
 
 set -euo pipefail
 
 # Install only this repo's tools; other mise entries remain the user's.
 echo "Installing dotfiles mise tools..."
-mise install --yes chezmoi 1password-cli
+mise install --yes{{ range $name, $_ := $tools }} {{ $name }}{{ end }}

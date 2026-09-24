@@ -7,7 +7,7 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 | Layer | Source | Examples |
 | --- | --- | --- |
 | Omarchy base | Omarchy installation | Bash and its init, Git, OpenSSH, curl, mise, desktop and shell defaults |
-| User-level tools | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`) |
+| User-level tools | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`), GitHub CLI (`gh`) |
 | System packages | This repo, through pacman (not implemented yet) | Packages the workstation needs beyond Omarchy's base |
 | Omarchy on-demand installs | Omarchy's `~/.local/bin` launchers | They run `mise use -g <tool>`, which writes `~/.config/mise/config.toml` |
 
@@ -17,15 +17,14 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 - SHOULD NOT write `~/.config/mise/config.toml`: Omarchy's on-demand launchers write it. The repo's tools live in the additive manifest `~/.config/mise/conf.d/dotfiles.toml`, which mise loads alongside it and which makes the matching launcher unnecessary.
 - `install.sh` checks for the Omarchy-provided prerequisites (`git`, `ssh`, `ssh-keygen`, `mise`) and stops with an actionable error when one is missing.
 
-## Bootstrap tools manifest
+## User-level tools manifest
 
-The manifest source is [home/dot_config/mise/conf.d/dotfiles.toml](../home/dot_config/mise/conf.d/dotfiles.toml). Three places must agree:
+The manifest source is [home/dot_config/mise/conf.d/dotfiles.toml](../home/dot_config/mise/conf.d/dotfiles.toml). It is the single list of mise tools this repo installs:
 
-1. The manifest itself.
-2. `BOOTSTRAP_TOOLS` in `install.sh`, which installs the tools before the first apply (chezmoi and `op` are needed to render templates).
-3. `run_once_after_10-install-mise-tools.sh.tmpl`, which installs only these tools and reruns when the manifest hash changes.
+- `run_once_after_10-install-mise-tools.sh.tmpl` reads the tool names from the manifest at render time, installs exactly those, and reruns when the manifest changes.
+- `BOOTSTRAP_TOOLS` in `install.sh` lists only the tools the first apply needs before any script runs: `chezmoi`, and `1password-cli` because templates call `op`. Each of them must also be in the manifest.
 
-Add a tool only when the retained bootstrap uses it. Update all three places in the same commit.
+To add a tool the workstation needs, add it to the manifest. Touch `BOOTSTRAP_TOOLS` only if templates need the tool during the first render.
 
 ## mise operations
 
