@@ -2,7 +2,8 @@
 {{- /*
   Claude Code also writes ~/.claude/settings.json (/model, /config), so this
   template merges the declared keys into the current file and keeps
-  everything else.
+  everything else. The file holds the subscription token, so it is 0600.
+  See policies/credentials.md "Claude Code".
 */ -}}
 {{- $settings := dict -}}
 {{- if .chezmoi.stdin -}}
@@ -11,4 +12,7 @@
 {{- /* No Claude attribution: commits and PRs carry only the agent's identity. */ -}}
 {{- $settings = setValueAtPath "attribution.commit" "" $settings -}}
 {{- $settings = setValueAtPath "attribution.pr" "" $settings -}}
+{{- /* Claude Code reads the token from here whoever starts it. */ -}}
+{{- $token := onepasswordRead (printf "op://%s/Claude Code - OAuth token/credential" .op_vault) -}}
+{{- $settings = setValueAtPath "env.CLAUDE_CODE_OAUTH_TOKEN" $token $settings -}}
 {{ toPrettyJson $settings }}

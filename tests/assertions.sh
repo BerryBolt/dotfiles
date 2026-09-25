@@ -125,11 +125,10 @@ codex_answers() {
       </dev/null) && answered_ok "$WORK/codex-answer"
 }
 
+# No credential in the environment: Claude Code must find the token in its settings.
 claude_answers() {
-  local token
-  token=$(with-op bash -c 'op read "op://$OP_VAULT/Claude Code - OAuth token/credential"') || return 1
   (cd "$WORK" &&
-    CLAUDE_CODE_OAUTH_TOKEN=$token env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+    env -u CLAUDE_CODE_OAUTH_TOKEN -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
       timeout 300 claude -p --model haiku "$PROMPT" </dev/null >"$WORK/claude-answer") &&
     answered_ok "$WORK/claude-answer"
 }
@@ -139,9 +138,11 @@ check "Codex is signed in with ChatGPT" \
   bash -c 'codex login status 2>&1 | grep -qx "Logged in using ChatGPT"'
 check "Codex answers on its configured model (live call)" codex_answers
 check "claude runs through Omarchy's launcher" claude --version
+check "~/.claude/settings.json is 600 (it holds the token)" \
+  mode_is "$HOME/.claude/settings.json" 600
 check "Claude Code adds no commit or PR attribution" \
   jq -e '.attribution.commit == "" and .attribution.pr == ""' "$HOME/.claude/settings.json"
-check "Claude Code answers with the subscription token (live call)" claude_answers
+check "Claude Code answers with the token from its settings (live call)" claude_answers
 
 echo "Git identity and signing"
 check "git email is the agent email" \

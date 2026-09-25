@@ -42,9 +42,11 @@ Every Codex process on the workstation shares the one login in `~/.codex/auth.js
 
 ### Claude Code
 
-Claude Code runs on the owner's subscription through a one-year token, not a runtime sign-in. The owner creates it with `claude setup-token` and stores it as the `Claude Code - OAuth token` item (`API Credential`; `credential` holds the token, `expires` its expiry date), and replaces it before it expires.
+Claude Code runs on the owner's subscription through a one-year token, not a runtime sign-in. The owner creates it with `claude setup-token` and stores it as the `Claude Code - OAuth token` item (`API Credential`; `credential` holds the token, `expires` its expiry date), and replaces it before it expires; a reapply then writes the new token.
 
-- MUST pass the token only to the process that runs `claude`, as `CLAUDE_CODE_OAUTH_TOKEN`.
+Apply writes the token as `CLAUDE_CODE_OAUTH_TOKEN` into the `env` block of `~/.claude/settings.json` (mode 0600), so `claude` finds it whoever starts it: a terminal, a script, a service, or a Codex worker, whose commands never inherit token variables. Anthropic documents the token as an environment variable and the `env` block as a way to set one; keeping the token there is this repo's choice. Claude Code passes `env` entries to the commands it runs, so those commands can read the token, as they can read `~/.config/op/env`.
+
+- MUST NOT export the token into a shell or a service environment; the settings file is its one location.
 - MUST NOT use it as an API key or with `claude --bare`, which ignores it. A subscription token works only in the unmodified `claude` CLI.
 
 ## Environment setup

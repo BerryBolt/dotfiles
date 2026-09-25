@@ -25,7 +25,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── .chezmoiscripts/         # run_once_after_10 (mise tools), run_after_30 (SSH)
 │   ├── modify_dot_bashrc        # additive block in Omarchy's ~/.bashrc
 │   ├── dot_gitconfig.tmpl
-│   ├── dot_claude/              # modify template for settings.json
+│   ├── dot_claude/              # modify template for settings.json (0600)
 │   ├── dot_codex/               # modify template for config.toml
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/
 │   └── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
@@ -83,7 +83,7 @@ chezmoi-with-op diff
 chezmoi-with-op cat ~/.gitconfig
 ```
 
-Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env` in logged sessions; their output contains the token.
+Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env` or `~/.claude/settings.json` in logged sessions; their output contains a token.
 
 `chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.config/op/env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
 

@@ -15,11 +15,11 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
 - A `Purelymail` Login item in that vault with the agent's mailbox address (`username`) and password. Mail is configured from it.
 - A Server item in that vault with the account's OS login: `username` (the installing account) and `password`. The installer selects it by title or item ID (`CHEZMOI_OP_ACCOUNT_ITEM`). Setup pipes the password to sudo once to grant the account passwordless sudo, because the agent administers its own VM unattended.
-- For Claude Code, a `Claude Code - OAuth token` API Credential item in that vault, holding a token the subscription owner created with `claude setup-token`. The installer does not need it.
+- A `Claude Code - OAuth token` API Credential item in that vault, holding a token the subscription owner created with `claude setup-token`. Apply writes it into Claude Code's settings.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-Installing needs no model sign-in, agent runtime, or workspace repository. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
+Installing needs no model sign-in, agent runtime, or workspace repository; Claude Code works from the token item. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
 
 ## Install
 
@@ -87,7 +87,7 @@ Omarchy remains responsible for its desktop, shell defaults, and existing tools.
 
 ## Validation
 
-- `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL` and `CHEZMOI_AGENT_HANDLE_GITHUB` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes. It makes one short model call each through Codex and Claude Code, so Codex must be signed in and the Claude Code token item must exist.
+- `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL` and `CHEZMOI_AGENT_HANDLE_GITHUB` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes. It makes one short model call each through Codex and Claude Code, so Codex must be signed in.
 - `tests/recovery.sh` — **destructive; disposable or test accounts only.** It deletes and restores the SSH key, the passwordless sudo rule, and the credential env file, and simulates a rotated key with a generated fixture key. It reads the token from stdin for the env-file restore. The live 1Password item and GitHub registration are not changed.
 
 Acceptance testing installs a pushed candidate from the public GitHub repository on a disposable Omarchy VM. Supply `OP_SERVICE_ACCOUNT_TOKEN` through ignored local configuration and use [tests/.env.local.example](tests/.env.local.example) for the remaining input names. Actual tokens, vault/account values, VM addresses, logins, and private platform records are local operational inputs.
