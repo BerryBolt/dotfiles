@@ -66,7 +66,7 @@ In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are availa
 
 ## Secrets model
 
-1Password remains the source of truth. The agent's only 1Password identity is its service account, with read and write item permissions in its vault ([access model](policies/credentials.md#access-model)). `~/.config/op/env` is the local service-account environment file. SSH private key material lives under `~/.ssh` with directory mode 0700 and key mode 0600. Claude Code's subscription token lives in `~/.claude/settings.json` (0600), where `claude` reads it whoever starts it ([Claude Code](policies/credentials.md#claude-code)). These are explicit local secret-materialization locations; secrets do not exist only in the env file.
+1Password remains the source of truth. The agent's only 1Password identity is its service account, with read and write item permissions in its vault ([access model](policies/credentials.md#access-model)). `~/.config/op/env` is the local service-account environment file. SSH private key material lives under `~/.ssh` with directory mode 0700 and key mode 0600. Claude Code's subscription token lives in `~/.claude/settings.json` (0600), where `claude -p` reads it whoever starts it ([Claude Code](policies/credentials.md#claude-code)). These are explicit local secret-materialization locations; secrets do not exist only in the env file.
 
 Credential wrappers load the env only into the child process that needs it. Bash startup does not export the token into the parent shell. Rendering obtains the token from the invoking process; the templates reject an absent token rather than replace stored credentials with an empty value.
 

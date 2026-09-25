@@ -19,7 +19,7 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-Installing needs no model sign-in, agent runtime, or workspace repository; Claude Code works from the token item. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
+Installing needs no model sign-in, agent runtime, or workspace repository; `claude -p` works from the token item. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
 
 ## Install
 
