@@ -27,7 +27,6 @@ CLIs with their own OAuth sign-in keep that session as runtime state, not config
 | --- | --- | --- |
 | `gh` | `gh auth login --web` | `~/.config/gh/` |
 | `wrangler` | `wrangler login` | `~/.config/.wrangler/` |
-| `xurl` | `xurl auth oauth2 --headless`, with the developer app's client ID and secret from 1Password in the environment | `~/.xurl` (refresh tokens rotate on every use) |
 
 The agent MUST NOT print or read these session files or tokens into its own context.
 

@@ -99,7 +99,6 @@ check "Brave is the default browser" \
 check "chezmoi resolves through mise" chezmoi --version
 check "op resolves through mise" op --version
 check "wrangler resolves through mise" wrangler --version
-check "xurl resolves through mise" xurl version
 check "dotfiles mise manifest is active" \
   bash -c 'mise config ls | grep -q "conf.d/dotfiles.toml"'
 

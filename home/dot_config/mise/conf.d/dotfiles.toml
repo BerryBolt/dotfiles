@@ -9,5 +9,3 @@ chezmoi = "latest"
 1password-cli = "latest"
 # Cloudflare's CLI, to deploy the agent's website. Runs on Omarchy's Node.
 "npm:wrangler" = "latest"
-# X's official API CLI, for the agent's X account.
-"github:xdevplatform/xurl" = "latest"
