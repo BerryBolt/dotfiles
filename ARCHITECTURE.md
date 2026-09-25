@@ -9,7 +9,10 @@
 | VM and platform | Platform provisioning | VM, Omarchy installation and initial access, network attachment and isolation, backups, host recovery |
 | Workstation setup | This repo | Packages and tools, OS maintenance, all user-level configuration, credential bootstrap, Git/SSH/GitHub access, runtime services, integrations, safe resumption |
 | Agent content | Workspace repo | Persona, instructions, projects, working material |
-| Runtime state | Its own backup contract | Sessions, caches, databases, working data; never in Git |
+| Secrets | 1Password | Credentials and private values; Git holds only references |
+| Runtime state | The machine only | Sessions, logs, caches, databases, working data; never in Git, and not needed to rebuild |
+
+Everything the agent writes belongs to one of the last four layers. Setup is captured both ways: a change made in this repository is applied, and a setting the agent changes on the live machine is captured back here before the next reapply would revert it. A whole file is captured with `chezmoi re-add`, and a file another program also writes by adding the chosen keys to the declared ones. Runtime state is never captured; what is worth keeping is written to the workspace repository.
 
 Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: it preserves Bash initialization and the user's mise settings, and extends files that Omarchy also writes.
 
@@ -35,7 +38,7 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 
-The current implementation does not yet install agent CLIs, start services, or configure integrations beyond mail. Those arrive as later increments of this repository. Cloning the workspace repository and restoring runtime state are separate from configuration synchronization.
+The current implementation does not yet install agent CLIs, start services, or configure integrations beyond mail. Those arrive as later increments of this repository. Cloning the workspace repository is separate from configuration synchronization, and runtime state is not restored.
 
 ## Managed state
 

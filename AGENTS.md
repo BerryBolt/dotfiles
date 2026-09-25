@@ -50,7 +50,7 @@ Any work done in this repo MUST align with `VISION.md` and MUST NOT violate the 
   - persona and instructions
   - projects and working material
 - the platform owns the VM, the Omarchy installation and initial access, network isolation, backups, and host recovery; it hands a verified VM to this repo.
-- mutable runtime state (sessions, caches, databases, working data) stays outside Git and follows its own backup and restore contract.
+- mutable runtime state (sessions, caches, databases, working data) stays on the machine, outside Git, and a rebuild does not need it.
 
 ## Vision
 
