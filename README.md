@@ -1,6 +1,6 @@
 # Dotfiles
 
-The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
+The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
 
 **Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
@@ -15,10 +15,11 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
 - A `Purelymail` Login item in that vault with the agent's mailbox address (`username`) and password. Mail is configured from it.
 - A Server item in that vault with the account's OS login: `username` (the installing account) and `password`. The installer selects it by title or item ID (`CHEZMOI_OP_ACCOUNT_ITEM`). Setup pipes the password to sudo once to grant the account passwordless sudo, because the agent administers its own VM unattended.
+- For Claude Code, a `Claude Code - OAuth token` API Credential item in that vault, holding a token the subscription owner created with `claude setup-token`. The installer does not need it.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-The current increment needs no model provider, agent runtime, or workspace repository.
+Installing needs no model sign-in, agent runtime, or workspace repository. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
 
 ## Install
 
@@ -67,6 +68,8 @@ ssh -T git@github.com        # authenticates with the restored key
 git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
+codex login --device-auth    # once: the owner approves the code with the ChatGPT subscription
+codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.
@@ -84,7 +87,7 @@ Omarchy remains responsible for its desktop, shell defaults, and existing tools.
 
 ## Validation
 
-- `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL` and `CHEZMOI_AGENT_HANDLE_GITHUB` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes.
+- `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL` and `CHEZMOI_AGENT_HANDLE_GITHUB` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes. It makes one short model call each through Codex and Claude Code, so Codex must be signed in and the Claude Code token item must exist.
 - `tests/recovery.sh` — **destructive; disposable or test accounts only.** It deletes and restores the SSH key, the passwordless sudo rule, and the credential env file, and simulates a rotated key with a generated fixture key. It reads the token from stdin for the env-file restore. The live 1Password item and GitHub registration are not changed.
 
 Acceptance testing installs a pushed candidate from the public GitHub repository on a disposable Omarchy VM. Supply `OP_SERVICE_ACCOUNT_TOKEN` through ignored local configuration and use [tests/.env.local.example](tests/.env.local.example) for the remaining input names. Actual tokens, vault/account values, VM addresses, logins, and private platform records are local operational inputs.

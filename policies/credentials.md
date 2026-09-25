@@ -27,8 +27,25 @@ CLIs with their own OAuth sign-in keep that session as runtime state, not config
 | --- | --- | --- |
 | `gh` | `gh auth login --web` | `~/.config/gh/` |
 | `wrangler` | `wrangler login` | `~/.config/.wrangler/` |
+| `codex` | `codex login --device-auth`; the owner approves the code with the ChatGPT subscription | `~/.codex/auth.json` |
 
 The agent MUST NOT print or read these session files or tokens into its own context.
+
+### Codex
+
+Every Codex process on the workstation shares the one login in `~/.codex/auth.json`, and its refresh token rotates: reusing an old one logs the account out.
+
+- MUST NOT copy `auth.json` to another machine or `CODEX_HOME`. A second machine gets its own device login.
+- MUST sign in or out only while no other Codex process runs.
+- On a "refresh token already used" or "revoked" error, MUST stop Codex work and report it to the owner instead of signing in again.
+- MUST NOT give a process that runs Codex `CODEX_API_KEY` or `OPENAI_API_KEY`. The managed config allows only the ChatGPT login, so a run never bills the API. With `CODEX_API_KEY` set, `codex exec` treats the key as the login in use, reports the conflict, and deletes the ChatGPT login.
+
+### Claude Code
+
+Claude Code runs on the owner's subscription through a one-year token, not a runtime sign-in. The owner creates it with `claude setup-token` and stores it as the `Claude Code - OAuth token` item (`API Credential`; `credential` holds the token, `expires` its expiry date), and replaces it before it expires.
+
+- MUST pass the token only to the process that runs `claude`, as `CLAUDE_CODE_OAUTH_TOKEN`.
+- MUST NOT use it as an API key or with `claude --bare`, which ignores it. A subscription token works only in the unmodified `claude` CLI.
 
 ## Environment setup
 
@@ -139,6 +156,7 @@ MUST use the correct category. MUST NOT use generic categories like `Password` o
 | Login | `<Service>` | `GitHub`, `Brave`, `Notion` |
 | Workstation account | `<hostname>` | The VM's hostname |
 | API key | `<Service> - API key` | `Brave Search - API key`, `Firecrawl - API key` |
+| Subscription OAuth token | `<Service> - OAuth token` | `Claude Code - OAuth token` |
 | Credential file | `<Service> - Credential File` | `Google Cloud - Credential File` |
 | SSH key | `<key filename>` | `id_ed25519` (new items) |
 

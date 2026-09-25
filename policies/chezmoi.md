@@ -25,7 +25,9 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── .chezmoiscripts/         # run_once_after_10 (mise tools), run_after_30 (SSH)
 │   ├── modify_dot_bashrc        # additive block in Omarchy's ~/.bashrc
 │   ├── dot_gitconfig.tmpl
-│   ├── dot_config/              # git/, mise/conf.d/, private_op/
+│   ├── dot_claude/              # modify template for settings.json
+│   ├── dot_codex/               # modify template for config.toml
+│   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/
 │   └── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
 ├── policies/
 ├── runbooks/
@@ -38,6 +40,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 `~/.bashrc` belongs to Omarchy's defaults and the user. `home/modify_dot_bashrc` is a chezmoi [modify script](https://www.chezmoi.io/reference/target-types/#scripts): chezmoi passes the current file on stdin and writes back its stdout. The script keeps every existing byte and maintains exactly one block between `# >>> dotfiles >>>` and `# <<< dotfiles <<<`, replacing it in place when its content changes. It fails, rather than guessing, when `~/.bashrc` is missing or the markers are damaged.
 
 mise supports layered configuration, so the bootstrap tools live in `~/.config/mise/conf.d/dotfiles.toml` and the user's `~/.config/mise/config.toml` is never written.
+
+Codex and Claude Code write their own choices into `~/.codex/config.toml` and `~/.claude/settings.json`. Their sources are chezmoi [modify templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file) (`chezmoi:modify-template`): each parses the current file from `.chezmoi.stdin`, sets the declared keys with `setValueAtPath`, and writes the result, so every other key survives. An unparsable file fails the apply. Add a setting by adding a `setValueAtPath` line; a choice the agent made live in the CLI is captured the same way.
 
 ### `private_` prefix and directory permissions
 

@@ -1,0 +1,18 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Codex also writes ~/.codex/config.toml (model picks, notices, project
+  trust), so this template merges the declared keys into the current file
+  and keeps everything else. See policies/credentials.md "Codex".
+*/ -}}
+{{- $config := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $config = fromToml .chezmoi.stdin -}}
+{{- end -}}
+{{- /* GPT-6 Luna on high effort. */ -}}
+{{- $config = setValueAtPath "model" "gpt-6-luna" $config -}}
+{{- $config = setValueAtPath "model_reasoning_effort" "high" $config -}}
+{{- /* The subscription login only: a run never bills the API. */ -}}
+{{- $config = setValueAtPath "forced_login_method" "chatgpt" $config -}}
+{{- /* One login in ~/.codex/auth.json, shared by every Codex process. */ -}}
+{{- $config = setValueAtPath "cli_auth_credentials_store" "file" $config -}}
+{{ toToml $config -}}

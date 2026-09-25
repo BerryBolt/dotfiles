@@ -18,7 +18,7 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; agent CLIs; services; further integrations; and safe resumption belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; the agent harness and other services; further integrations; and safe resumption belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
@@ -38,7 +38,7 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 
-The current implementation does not yet install agent CLIs, start services, or configure integrations beyond mail. Those arrive as later increments of this repository. Cloning the workspace repository is separate from configuration synchronization, and runtime state is not restored.
+The current implementation does not yet start services or configure integrations beyond mail and the agent CLIs. Those arrive as later increments of this repository. Cloning the workspace repository is separate from configuration synchronization, and runtime state is not restored.
 
 ## Managed state
 
@@ -52,11 +52,15 @@ The current implementation does not yet install agent CLIs, start services, or c
 | `~/.gitconfig` | `home/dot_gitconfig.tmpl` | Identity and SSH commit/tag signing with `~/.ssh/id_ed25519`. Omarchy's `~/.config/git/config` still applies underneath. |
 | `~/.config/git/allowed_signers` | `home/dot_config/git/allowed_signers.tmpl` | Agent email and the public key of the `op_ssh_item` item. |
 | `~/.config/himalaya/config.toml` | `home/dot_config/himalaya/config.toml.tmpl` | The agent's Purelymail mailbox over IMAP and SMTP with TLS. The address comes from the `Purelymail` item at render time; `himalaya` reads the password through `with-op` on each connection, so the file holds none. |
+| `~/.codex/config.toml` | `home/dot_codex/modify_config.toml` | Merged: sets the model (`gpt-6-luna`), high reasoning effort, the ChatGPT login as the only login method, and file credential storage in `~/.codex/auth.json`. Keeps every key Codex writes itself, such as model picks, notices, and project trust. |
+| `~/.claude/settings.json` | `home/dot_claude/modify_settings.json` | Merged: turns off Claude Code's commit and PR attribution. Keeps every key Claude Code writes itself, such as `/model` and `/config` choices. |
 | `~/.local/share/ssh-bootstrap/` | `home/dot_local/share/ssh-bootstrap/` | GitHub host keys and fingerprints pinned from GitHub's documentation. |
 | Script 10 | `run_once_after_10-install-mise-tools.sh.tmpl` | Installs the tools named in the manifest (read at render time); reruns when the manifest hash changes. |
 | Script 20 | `run_after_20-passwordless-sudo.sh.tmpl` | Ensures `/etc/sudoers.d/05-dotfiles-nopasswd` (root:root 0440) grants the account `NOPASSWD: ALL`. While sudo still asks for a password, it pipes the `op_account_item` password to `sudo -S` to install the rule, validating it with `visudo` before it takes effect. It fails if sudo still needs a password afterwards. The file sorts after the installer's per-user rule and before Omarchy's narrower rules. |
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
 | Script 40 | `run_once_after_40-install-system-packages.sh` | Installs system packages with Omarchy's commands: `himalaya` from Arch's repositories, and Brave through `omarchy-install-browser` (AUR, Omarchy's flags and theme policy), then makes it the default browser. Reruns when the script changes. |
+
+`codex` and `claude` come from Omarchy's on-demand launchers, which install them through mise on first use; this repository declares only their settings. Both files are extended rather than owned because each CLI also writes its own choices there: the merge templates set the declared keys and keep the rest.
 
 In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are available. Omarchy puts `~/.local/bin` and the mise shims on `PATH` for login and SSH shells; both wrappers also prepend those directories themselves for stripped-`PATH` callers. Non-interactive callers use `with-op op ...` because the `op()` function exists only in interactive shells.
 
@@ -91,7 +95,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Validation
 
-- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, system packages and tools, mail login (IMAP, and SMTP with a `NOOP` that sends nothing), credential scope and permissions, identity and local commit signing, key and host trust, SSH source sync, and managed-file drift.
+- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, system packages and tools, mail login (IMAP, and SMTP with a `NOOP` that sends nothing), the agent CLIs (Claude Code's attribution setting, and one live call each that proves the Codex ChatGPT login and the Claude Code subscription token), credential scope and permissions, identity and local commit signing, key and host trust, SSH source sync, and managed-file drift.
 - `tests/recovery.sh` runs on a disposable installed account. It proves the recovery paths above: a deleted key, a previous (fixture) key being replaced, a deleted sudo rule restored with the account password from 1Password, and a deleted env file restored from a token supplied on stdin.
 
 Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository: the installer is downloaded from `raw.githubusercontent.com/.../<sha>/install.sh` and run with `--revision <sha>`, so the installer and the applied source are the same commit on fresh and repeat installs. Machine access and private operational context stay in ignored local inputs.

@@ -4,7 +4,8 @@
 #
 # Run as the target user after install.sh, from a shell that does NOT hold
 # the service-account token. Uses live 1Password and GitHub access, creates
-# one signed commit in a temporary local repository, and never pushes.
+# one signed commit in a temporary local repository, and never pushes. Makes
+# one short model call each through Codex and Claude Code.
 # Prints no credential values.
 #
 # Inputs (non-secret):
@@ -109,6 +110,38 @@ check "IMAP login works and lists the inbox" \
 check "SMTP login works (NOOP; nothing is sent)" himalaya smtp raw -- NOOP
 check "the mail config stores no password" \
   bash -c '! grep -q "password.raw" "$1"' _ "$HOME/.config/himalaya/config.toml"
+
+echo "Agent CLIs"
+# Live calls prove each sign-in works; each asks for one word and nothing else.
+PROMPT="Reply with exactly OK and nothing else."
+answered_ok() {
+  [ "$(tr -d '[:space:]' <"$1")" = OK ]
+}
+
+codex_answers() {
+  (cd "$WORK" &&
+    env -u CODEX_API_KEY -u OPENAI_API_KEY timeout 300 codex exec --skip-git-repo-check \
+      --ephemeral --sandbox read-only --output-last-message "$WORK/codex-answer" "$PROMPT" \
+      </dev/null) && answered_ok "$WORK/codex-answer"
+}
+
+claude_answers() {
+  local token
+  token=$(with-op bash -c 'op read "op://$OP_VAULT/Claude Code - OAuth token/credential"') || return 1
+  (cd "$WORK" &&
+    CLAUDE_CODE_OAUTH_TOKEN=$token env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+      timeout 300 claude -p --model haiku "$PROMPT" </dev/null >"$WORK/claude-answer") &&
+    answered_ok "$WORK/claude-answer"
+}
+
+check "codex runs through Omarchy's launcher" codex --version
+check "Codex is signed in with ChatGPT" \
+  bash -c 'codex login status 2>&1 | grep -qx "Logged in using ChatGPT"'
+check "Codex answers on its configured model (live call)" codex_answers
+check "claude runs through Omarchy's launcher" claude --version
+check "Claude Code adds no commit or PR attribution" \
+  jq -e '.attribution.commit == "" and .attribution.pr == ""' "$HOME/.claude/settings.json"
+check "Claude Code answers with the subscription token (live call)" claude_answers
 
 echo "Git identity and signing"
 check "git email is the agent email" \

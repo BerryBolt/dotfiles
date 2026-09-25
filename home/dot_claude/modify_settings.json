@@ -1,0 +1,14 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Claude Code also writes ~/.claude/settings.json (/model, /config), so this
+  template merges the declared keys into the current file and keeps
+  everything else.
+*/ -}}
+{{- $settings := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $settings = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- /* No Claude attribution: commits and PRs carry only the agent's identity. */ -}}
+{{- $settings = setValueAtPath "attribution.commit" "" $settings -}}
+{{- $settings = setValueAtPath "attribution.pr" "" $settings -}}
+{{ toPrettyJson $settings }}
