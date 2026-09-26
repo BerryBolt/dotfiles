@@ -24,6 +24,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── .chezmoi.toml.tmpl       # config/data template (no prompts after install.sh)
 │   ├── .chezmoiscripts/         # run_once_after_10 (mise tools), run_after_30 (SSH)
 │   ├── modify_dot_bashrc        # additive block in Omarchy's ~/.bashrc
+│   ├── modify_private_dot_claude.json  # onboarding flag in ~/.claude.json (0600)
 │   ├── dot_gitconfig.tmpl
 │   ├── dot_claude/              # modify template for settings.json (0600)
 │   ├── dot_codex/               # modify template for config.toml
@@ -41,7 +42,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 
 mise supports layered configuration, so the bootstrap tools live in `~/.config/mise/conf.d/dotfiles.toml` and the user's `~/.config/mise/config.toml` is never written.
 
-Codex and Claude Code write their own choices into `~/.codex/config.toml` and `~/.claude/settings.json`. Their sources are chezmoi [modify templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file) (`chezmoi:modify-template`): each parses the current file from `.chezmoi.stdin`, sets the declared keys with `setValueAtPath`, and writes the result, so every other key survives. An unparsable file fails the apply. Add a setting by adding a `setValueAtPath` line; a choice the agent made live in the CLI is captured the same way.
+Codex and Claude Code write their own choices into `~/.codex/config.toml` and `~/.claude/settings.json`. Their sources are chezmoi [modify templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file) (`chezmoi:modify-template`): each parses the current file from `.chezmoi.stdin`, sets the declared keys with `setValueAtPath`, and writes the result, so every other key survives. An unparsable file fails the apply. Add a setting by adding a `setValueAtPath` line; a choice the agent made live in the CLI is captured the same way. `~/.claude.json` is Claude Code's runtime state rather than settings, so its modify template sets only the onboarding flag and, once the flag is set, returns the file unchanged.
 
 ### `private_` prefix and directory permissions
 

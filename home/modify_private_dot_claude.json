@@ -1,0 +1,19 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  ~/.claude.json is Claude Code's runtime state, which it rewrites on every
+  launch, so this template declares one key: onboarding is complete. Without
+  it, interactive `claude` starts first-run onboarding and asks for a login
+  method although the token in ~/.claude/settings.json already signs it in.
+  Once the key is set, the file passes through byte for byte, so chezmoi
+  never reformats Claude Code's state or races its writes.
+  See policies/credentials.md "Claude Code".
+*/ -}}
+{{- $state := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $state = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- if eq (toJson (get $state "hasCompletedOnboarding")) "true" -}}
+{{-   .chezmoi.stdin -}}
+{{- else -}}
+{{-   toPrettyJson (setValueAtPath "hasCompletedOnboarding" true $state) -}}
+{{- end -}}

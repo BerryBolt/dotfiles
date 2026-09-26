@@ -142,6 +142,8 @@ check "~/.claude/settings.json is 600 (it holds the token)" \
   mode_is "$HOME/.claude/settings.json" 600
 check "Claude Code adds no commit or PR attribution" \
   jq -e '.attribution.commit == "" and .attribution.pr == ""' "$HOME/.claude/settings.json"
+check "interactive claude skips first-run onboarding" \
+  jq -e '.hasCompletedOnboarding == true' "$HOME/.claude.json"
 check "Claude Code answers with the token from its settings (live call)" claude_answers
 
 echo "Git identity and signing"
