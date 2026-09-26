@@ -196,5 +196,5 @@ Templates that call `onepasswordRead` render only through `chezmoi-with-op` (or 
 
 - Location: `home/.chezmoiscripts/`
 - `run_once_after_<order>-<name>.sh.tmpl`: runs once per content hash. Embed a manifest hash when a separate file should retrigger it (script 10).
-- `run_after_<order>-<name>.sh.tmpl`: runs on every apply. Use it for ensure-state work that must repair drift even when the script is unchanged (script 30).
+- `run_after_<order>-<name>.sh.tmpl`: runs on every apply. Use it for ensure-state work that must repair drift even when the script is unchanged (scripts 20 and 30). Because they always run, `chezmoi-with-op diff` and `status` always list them, even on a converged machine; add `--exclude=scripts` to check managed files alone.
 - Scripts fail on missing dependencies, credentials, or keys; they do not skip silently.
