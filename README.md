@@ -1,6 +1,6 @@
 # Dotfiles
 
-The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
+The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
 
 **Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
@@ -13,13 +13,14 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - A 1Password service-account token scoped to the intended vault, with read and write item permissions there. The agent has no 1Password user account; see the [access model](policies/credentials.md#access-model).
 - An SSH Key item in that vault, with a valid OpenSSH private key and matching public key suitable for unattended use. The installer selects it by title or item ID (`CHEZMOI_OP_SSH_ITEM`); an ID keeps working if the item is renamed. It is always installed as `~/.ssh/id_ed25519`, whatever the item is called.
 - That public key registered to the intended GitHub account for authentication and signing, with read access to the dotfiles repository.
+- The agent's workspace repository on GitHub, readable by that account. The installer takes it as `owner/name` (`CHEZMOI_AGENT_WORKSPACE_REPO`) and clones it into `~/brain`.
 - A `Purelymail` Login item in that vault with the agent's mailbox address (`username`) and password. Mail is configured from it.
 - A Server item in that vault with the account's OS login: `username` (the installing account) and `password`. The installer selects it by title or item ID (`CHEZMOI_OP_ACCOUNT_ITEM`). Setup pipes the password to sudo once to grant the account passwordless sudo, because the agent administers its own VM unattended.
 - A `Claude Code - OAuth token` API Credential item in that vault, holding a token the subscription owner created with `claude setup-token`. Apply writes it into Claude Code's settings.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-Installing needs no model sign-in, agent runtime, or workspace repository; Claude Code works from the token item. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
+Installing needs no model sign-in or agent runtime; Claude Code works from the token item. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
 
 ## Install
 
@@ -27,15 +28,15 @@ Installing needs no model sign-in, agent runtime, or workspace repository; Claud
 curl -fsSL https://berrybolt.bot/install.sh | bash
 ```
 
-The installer prompts for the account name, email, GitHub handle, vault, SSH key item, workstation account item, and token, then shows a review step. For an unattended run, set every input in the environment and pass `--non-interactive`. Keep the token inside a subshell, off the command line and out of shell history:
+The installer prompts for the account name, email, GitHub handle, workspace repository, vault, SSH key item, workstation account item, and token, then shows a review step. For an unattended run, set every input in the environment and pass `--non-interactive`. Keep the token inside a subshell, off the command line and out of shell history:
 
 ```bash
 (
   read -rsp 'Service account token: ' OP_SERVICE_ACCOUNT_TOKEN && echo
   export OP_SERVICE_ACCOUNT_TOKEN
   export CHEZMOI_AGENT_NAME="..." CHEZMOI_AGENT_EMAIL="..." \
-    CHEZMOI_AGENT_HANDLE_GITHUB="..." CHEZMOI_OP_VAULT="..." CHEZMOI_OP_SSH_ITEM="..." \
-    CHEZMOI_OP_ACCOUNT_ITEM="..."
+    CHEZMOI_AGENT_HANDLE_GITHUB="..." CHEZMOI_AGENT_WORKSPACE_REPO="owner/name" \
+    CHEZMOI_OP_VAULT="..." CHEZMOI_OP_SSH_ITEM="..." CHEZMOI_OP_ACCOUNT_ITEM="..."
   curl -fsSL https://berrybolt.bot/install.sh | bash -s -- --non-interactive
 )
 ```
@@ -43,6 +44,8 @@ The installer prompts for the account name, email, GitHub handle, vault, SSH key
 `https://berrybolt.bot/install.sh` redirects to `install.sh` on this repository's `main` branch.
 
 The source comes from `https://github.com/<GitHub handle>/dotfiles.git`, on its default branch unless you pin a revision.
+
+After the apply has restored the SSH key, the installer clones the workspace repository into `~/brain` over SSH. When `~/brain` is already a checkout, it leaves it as is.
 
 ### Install an exact revision
 
@@ -65,6 +68,7 @@ op whoami                    # service account; the token stays in op's subshell
 with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
 chezmoi-with-op apply        # reapply managed files and SSH restoration
 ssh -T git@github.com        # authenticates with the restored key
+git -C ~/brain pull          # the workspace checkout, cloned by the installer
 git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
@@ -88,7 +92,7 @@ Omarchy remains responsible for its desktop, shell defaults, and existing tools.
 
 ## Validation
 
-- `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL` and `CHEZMOI_AGENT_HANDLE_GITHUB` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes. It makes one short model call each through Codex and Claude Code, so Codex must be signed in.
+- `tests/assertions.sh` — run as the installed user on the Omarchy target with `CHEZMOI_AGENT_EMAIL`, `CHEZMOI_AGENT_HANDLE_GITHUB`, and `CHEZMOI_AGENT_WORKSPACE_REPO` set. It uses live 1Password and GitHub access and creates one local signed commit in a temporary repository, which it never pushes. It makes one short model call each through Codex and Claude Code, so Codex must be signed in.
 - `tests/recovery.sh` — **destructive; disposable or test accounts only.** It deletes and restores the SSH key, the passwordless sudo rule, and the credential env file, and simulates a rotated key with a generated fixture key. It reads the token from stdin for the env-file restore. The live 1Password item and GitHub registration are not changed.
 
 Acceptance testing installs a pushed candidate from the public GitHub repository on a disposable Omarchy VM. Supply `OP_SERVICE_ACCOUNT_TOKEN` through ignored local configuration and use [tests/.env.local.example](tests/.env.local.example) for the remaining input names. Actual tokens, vault/account values, VM addresses, logins, and private platform records are local operational inputs.

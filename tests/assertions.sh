@@ -11,12 +11,14 @@
 # Inputs (non-secret):
 #   CHEZMOI_AGENT_EMAIL          expected Git identity email (required)
 #   CHEZMOI_AGENT_HANDLE_GITHUB  expected GitHub SSH greeting (required)
+#   CHEZMOI_AGENT_WORKSPACE_REPO expected origin of ~/brain, owner/name (required)
 #   EXPECTED_REVISION            full SHA the chezmoi source must be at (optional)
 
 set -euo pipefail
 
 : "${CHEZMOI_AGENT_EMAIL:?set CHEZMOI_AGENT_EMAIL}"
 : "${CHEZMOI_AGENT_HANDLE_GITHUB:?set CHEZMOI_AGENT_HANDLE_GITHUB}"
+: "${CHEZMOI_AGENT_WORKSPACE_REPO:?set CHEZMOI_AGENT_WORKSPACE_REPO}"
 
 # Initialize PATH before any check: a child install cannot change this
 # process's environment, and callers may start with a stripped PATH.
@@ -25,6 +27,7 @@ export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/local/bin:/usr/
 unset OP_SERVICE_ACCOUNT_TOKEN OP_VAULT OP_FORMAT
 
 SOURCE_DIR="$HOME/.local/share/chezmoi"
+WORKSPACE_DIR="$HOME/brain"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -203,6 +206,13 @@ if [ -n "${EXPECTED_REVISION:-}" ]; then
 fi
 # run_after_ scripts are ensure-state and always pending; check files only.
 check "no managed-file drift" chezmoi-with-op verify --exclude=scripts
+
+echo "Workspace"
+check "~/brain is a checkout of $CHEZMOI_AGENT_WORKSPACE_REPO over SSH" \
+  test "$(git -C "$WORKSPACE_DIR" remote get-url origin 2>/dev/null)" = \
+  "git@github.com:$CHEZMOI_AGENT_WORKSPACE_REPO.git"
+check "~/brain reaches its origin over SSH (ls-remote origin)" \
+  env GIT_SSH_COMMAND="ssh -o BatchMode=yes" git -C "$WORKSPACE_DIR" ls-remote --exit-code origin HEAD
 
 echo ""
 printf '%d passed, %d failed\n' "$pass" "$fail"

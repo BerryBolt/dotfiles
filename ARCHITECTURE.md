@@ -18,14 +18,14 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; the agent harness and other services; further integrations; and safe resumption belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; the agent harness and other services; further integrations; and safe resumption belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
 - `.chezmoiroot` selects `home/` as the managed source root.
 - The default checkout is `~/.local/share/chezmoi`; user configuration is rendered into the home directory.
 - Policies, runbooks, skills, and tests stay in the source repository and are not applied.
-- Account name, email, GitHub handle, vault name, and the item selectors for the SSH key (`op_ssh_item`) and the workstation account (`op_account_item`), each a title or item ID, are chezmoi data. The service-account token is never persisted in chezmoi data or committed source.
+- Account name, email, GitHub handle, vault name, and the item selectors for the SSH key (`op_ssh_item`) and the workstation account (`op_account_item`), each a title or item ID, are chezmoi data. The service-account token is never persisted in chezmoi data or committed source. The workspace repository is an installer input only; apply never reads it.
 - Source updates and target applies are separate operations. Review source changes, then apply them with the required credential context.
 
 Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies/chezmoi.md). Isolate development rendering and testing from the operator's real home directory.
@@ -33,12 +33,13 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 ## Bootstrap flow
 
 1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything. The installer itself never installs system packages; apply script 40 does, once sudo is passwordless.
-2. **Inputs.** It collects the account name, email, GitHub handle, vault, SSH key item, workstation account item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
+2. **Inputs.** It collects the account name, email, GitHub handle, workspace repository (`owner/name`), vault, SSH key item, workstation account item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
 3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, the SSH key item is readable, and the workstation account item names the installing account. While sudo still asks for a password, it also checks the item's password against sudo. Bad credentials fail here, before any configuration is written.
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
+6. **Workspace.** Once apply has restored the SSH key and pinned GitHub's host keys, the installer clones `git@github.com:<owner/name>.git` into `~/brain`. An existing checkout there belongs to the agent and is left as is; anything else at that path stops the installer. A failed clone stops it with an error, and rerunning the installer retries the clone.
 
-The current implementation does not yet start services or configure integrations beyond mail and the agent CLIs. Those arrive as later increments of this repository. Cloning the workspace repository is separate from configuration synchronization, and runtime state is not restored.
+The current implementation does not yet start services or configure integrations beyond mail and the agent CLIs. Those arrive as later increments of this repository. The workspace clone is an installer step, not part of apply: reapply never reads or changes `~/brain`, and runtime state is not restored.
 
 ## Managed state
 
@@ -97,7 +98,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Validation
 
-- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, system packages and tools, mail login (IMAP, and SMTP with a `NOOP` that sends nothing), the agent CLIs (Claude Code's settings and their 0600 mode, its onboarding flag, and one live call each that proves the Codex ChatGPT login and that Claude Code finds its token with none in the environment and answers on its default model), credential scope and permissions, identity and local commit signing, key and host trust (GitHub SSH offers only the agent's key), SSH source sync, and managed-file drift.
+- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, system packages and tools, mail login (IMAP, and SMTP with a `NOOP` that sends nothing), the agent CLIs (Claude Code's settings and their 0600 mode, its onboarding flag, and one live call each that proves the Codex ChatGPT login and that Claude Code finds its token with none in the environment and answers on its default model), credential scope and permissions, identity and local commit signing, key and host trust (GitHub SSH offers only the agent's key), SSH source sync, managed-file drift, and the workspace checkout's origin and SSH access.
 - `tests/recovery.sh` runs on a disposable installed account. It proves the recovery paths above: a deleted key, a previous (fixture) key being replaced, a deleted sudo rule restored with the account password from 1Password, and a deleted env file restored from a token supplied on stdin.
 
 Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository: the installer is downloaded from `raw.githubusercontent.com/.../<sha>/install.sh` and run with `--revision <sha>`, so the installer and the applied source are the same commit on fresh and repeat installs. Machine access and private operational context stay in ignored local inputs.

@@ -9,6 +9,7 @@ SCRIPT_URL="https://berrybolt.bot/install.sh"
 NONINTERACTIVE="${CHEZMOI_NONINTERACTIVE:-${NONINTERACTIVE:-}}"
 REVISION="${DOTFILES_REVISION:-}"
 SOURCE_DIR="$HOME/.local/share/chezmoi"
+WORKSPACE_DIR="$HOME/brain"
 
 # Tools the first apply needs (templates call op). They must also be listed
 # in home/dot_config/mise/conf.d/dotfiles.toml, which apply script 10 installs.
@@ -27,6 +28,8 @@ Env overrides:
   CHEZMOI_AGENT_NAME=...
   CHEZMOI_AGENT_EMAIL=...
   CHEZMOI_AGENT_HANDLE_GITHUB=...
+  CHEZMOI_AGENT_WORKSPACE_REPO=...  # workspace repository on GitHub
+                                    # (owner/name), cloned into ~/brain
   CHEZMOI_OP_VAULT=...
   CHEZMOI_OP_SSH_ITEM=...   # SSH Key item title or ID in that vault
   CHEZMOI_OP_ACCOUNT_ITEM=...  # Server item title or ID with this account's
@@ -256,6 +259,7 @@ review_and_edit() {
     echo "    Agent name: $AGENT_NAME"
     echo "    Agent email: $AGENT_EMAIL"
     echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
+    echo "    Workspace repository: $WORKSPACE_REPO"
     echo "    1Password vault: $OP_VAULT"
     echo "    1Password SSH key item: $OP_SSH_ITEM"
     echo "    1Password workstation account item: $OP_ACCOUNT_ITEM"
@@ -271,11 +275,12 @@ review_and_edit() {
     echo "    2) Edit agent name"
     echo "    3) Edit agent email"
     echo "    4) Edit GitHub handle"
-    echo "    5) Edit 1Password vault"
-    echo "    6) Edit 1Password SSH key item"
-    echo "    7) Edit 1Password workstation account item"
-    echo "    8) Edit token"
-    printf "    Enter choice [1-8]: "
+    echo "    5) Edit workspace repository"
+    echo "    6) Edit 1Password vault"
+    echo "    7) Edit 1Password SSH key item"
+    echo "    8) Edit 1Password workstation account item"
+    echo "    9) Edit token"
+    printf "    Enter choice [1-9]: "
     read -r selection < "$TTY_DEV" || abort
     case "$selection" in
       1|"")
@@ -300,18 +305,22 @@ review_and_edit() {
         AGENT_HANDLE_GITHUB=$PROMPT_VALUE
         ;;
       5)
+        prompt_string "Workspace repository on GitHub (owner/name)" "" "$WORKSPACE_REPO"
+        WORKSPACE_REPO=$PROMPT_VALUE
+        ;;
+      6)
         prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
         OP_VAULT=$PROMPT_VALUE
         ;;
-      6)
+      7)
         prompt_string "1Password SSH key item (title or ID)" "id_ed25519" "$OP_SSH_ITEM"
         OP_SSH_ITEM=$PROMPT_VALUE
         ;;
-      7)
+      8)
         prompt_string "1Password workstation account item (title or ID)" "$(uname -n)" "$OP_ACCOUNT_ITEM"
         OP_ACCOUNT_ITEM=$PROMPT_VALUE
         ;;
-      8)
+      9)
         prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
         OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
         ;;
@@ -327,6 +336,7 @@ missing_inputs() {
   is_blank "$AGENT_NAME" && missing="$missing CHEZMOI_AGENT_NAME"
   is_blank "$AGENT_EMAIL" && missing="$missing CHEZMOI_AGENT_EMAIL"
   is_blank "$AGENT_HANDLE_GITHUB" && missing="$missing CHEZMOI_AGENT_HANDLE_GITHUB"
+  is_blank "$WORKSPACE_REPO" && missing="$missing CHEZMOI_AGENT_WORKSPACE_REPO"
   is_blank "$OP_VAULT" && missing="$missing CHEZMOI_OP_VAULT"
   is_blank "$OP_SSH_ITEM" && missing="$missing CHEZMOI_OP_SSH_ITEM"
   is_blank "$OP_ACCOUNT_ITEM" && missing="$missing CHEZMOI_OP_ACCOUNT_ITEM"
@@ -338,6 +348,7 @@ collect_inputs() {
   AGENT_NAME="${CHEZMOI_AGENT_NAME:-}"
   AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
   AGENT_HANDLE_GITHUB="${CHEZMOI_AGENT_HANDLE_GITHUB:-}"
+  WORKSPACE_REPO="${CHEZMOI_AGENT_WORKSPACE_REPO:-}"
   OP_VAULT="${CHEZMOI_OP_VAULT:-}"
   OP_SSH_ITEM="${CHEZMOI_OP_SSH_ITEM:-}"
   OP_ACCOUNT_ITEM="${CHEZMOI_OP_ACCOUNT_ITEM:-}"
@@ -380,6 +391,10 @@ Tip: curl -fsSL $SCRIPT_URL | bash"
       prompt_string "GitHub handle" "BerryBolt" "$AGENT_HANDLE_GITHUB"
       AGENT_HANDLE_GITHUB=$PROMPT_VALUE
     fi
+    if is_blank "$WORKSPACE_REPO"; then
+      prompt_string "Workspace repository on GitHub (owner/name)" "" "$WORKSPACE_REPO"
+      WORKSPACE_REPO=$PROMPT_VALUE
+    fi
     if is_blank "$OP_VAULT"; then
       prompt_string "1Password vault name" "Berry Bolt" "$OP_VAULT"
       OP_VAULT=$PROMPT_VALUE
@@ -403,6 +418,14 @@ Tip: curl -fsSL $SCRIPT_URL | bash"
     fi
 
     review_and_edit
+  fi
+}
+
+# The clone URL is built from owner/name; reject anything else before any
+# change is made.
+validate_workspace_repo() {
+  if ! printf '%s' "$WORKSPACE_REPO" | grep -Eq '^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$'; then
+    log_error "The workspace repository must be a GitHub owner/name (got: $WORKSPACE_REPO). Check CHEZMOI_AGENT_WORKSPACE_REPO."
   fi
 }
 
@@ -520,6 +543,27 @@ sync_source() {
   fi
 }
 
+# Clone the workspace repository over SSH, which works once apply has restored
+# the key and pinned GitHub's host keys. An existing checkout belongs to the
+# agent and is left as is.
+clone_workspace() {
+  url="git@github.com:${WORKSPACE_REPO}.git"
+
+  if [ -d "$WORKSPACE_DIR/.git" ]; then
+    log_info "Workspace checkout already at $WORKSPACE_DIR; leaving it as is."
+    return
+  fi
+  if [ -e "$WORKSPACE_DIR" ] && [ -n "$(ls -A "$WORKSPACE_DIR" 2>/dev/null)" ]; then
+    log_error "$WORKSPACE_DIR exists but is not a git checkout. Move it aside and re-run."
+  fi
+
+  log_info "Cloning workspace $url into $WORKSPACE_DIR..."
+  if ! git clone --quiet "$url" "$WORKSPACE_DIR"; then
+    log_error "Failed to clone the workspace repository: $url
+GitHub account $AGENT_HANDLE_GITHUB needs read access to it. Grant it and re-run."
+  fi
+}
+
 bootstrap_main() {
   repo=${1:-}
 
@@ -527,6 +571,7 @@ bootstrap_main() {
   validate_revision
   log_header
   collect_inputs
+  validate_workspace_repo
 
   if is_blank "$repo"; then
     repo="https://github.com/${AGENT_HANDLE_GITHUB}/dotfiles.git"
@@ -550,9 +595,12 @@ bootstrap_main() {
     log_error "chezmoi apply failed"
   fi
 
+  clone_workspace
+
   echo ""
   log_success "Bootstrap complete"
   echo '    Open a new terminal, or run: exec bash -l'
+  echo "    Workspace checkout: $WORKSPACE_DIR"
   echo "    Credential commands: op, with-op, chezmoi-with-op (see policies/credentials.md)."
   echo "    Re-run behavior and recovery scope: ARCHITECTURE.md#recovery."
   echo ""
