@@ -46,6 +46,8 @@ Claude Code runs on the owner's subscription through a one-year token, not a run
 
 Apply writes the token as `CLAUDE_CODE_OAUTH_TOKEN` into the `env` block of `~/.claude/settings.json` (mode 0600), so `claude` finds it whoever starts it: a terminal, a script, a service, or a Codex worker, whose commands never inherit token variables. Interactive `claude` would still start first-run onboarding, which asks for a login method even with the token set, so apply also marks onboarding complete in `~/.claude.json`. Anthropic documents the token as an environment variable and the `env` block as a way to set one; keeping the token there is this repo's choice. Claude Code passes `env` entries to the commands it runs, so those commands can read the token, as they can read `~/.config/op/env`.
 
+The token is limited to inference and cannot read the account profile, so Claude Code does not know the subscription plan. It labels the plan "Claude API", `/usage` shows only the session's own totals, and the plan-based default model does not apply, so the settings pin Opus 5.5 (`claude-opus-5-5`). Usage-limit warnings still appear, and `/model` still lists the models the subscription offers.
+
 - MUST NOT export the token into a shell or a service environment; the settings file is its one location.
 - MUST NOT use it as an API key or with `claude --bare`, which ignores it. A subscription token works only in the unmodified `claude` CLI.
 

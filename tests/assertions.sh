@@ -129,8 +129,10 @@ codex_answers() {
 claude_answers() {
   (cd "$WORK" &&
     env -u CLAUDE_CODE_OAUTH_TOKEN -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
-      timeout 300 claude -p --model haiku "$PROMPT" </dev/null >"$WORK/claude-answer") &&
-    answered_ok "$WORK/claude-answer"
+      timeout 300 claude -p --output-format json "$PROMPT" </dev/null >"$WORK/claude-answer.json") &&
+    jq -r .result "$WORK/claude-answer.json" >"$WORK/claude-answer" &&
+    answered_ok "$WORK/claude-answer" &&
+    jq -e '.modelUsage | has("claude-opus-5-5")' "$WORK/claude-answer.json" >/dev/null
 }
 
 check "codex runs through Omarchy's launcher" codex --version
@@ -142,9 +144,11 @@ check "~/.claude/settings.json is 600 (it holds the token)" \
   mode_is "$HOME/.claude/settings.json" 600
 check "Claude Code adds no commit or PR attribution" \
   jq -e '.attribution.commit == "" and .attribution.pr == ""' "$HOME/.claude/settings.json"
+check "Claude Code defaults to Opus 5.5" \
+  jq -e '.model == "claude-opus-5-5"' "$HOME/.claude/settings.json"
 check "interactive claude skips first-run onboarding" \
   jq -e '.hasCompletedOnboarding == true' "$HOME/.claude.json"
-check "Claude Code answers with the token from its settings (live call)" claude_answers
+check "Claude Code answers on Opus 5.5 with the token from its settings (live call)" claude_answers
 
 echo "Git identity and signing"
 check "git email is the agent email" \

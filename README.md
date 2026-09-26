@@ -70,6 +70,7 @@ sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
 codex login --device-auth    # once: the owner approves the code with the ChatGPT subscription
 codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
+claude -p "..."              # Opus 5.5 on the subscription token
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.
