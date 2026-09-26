@@ -153,6 +153,24 @@ check "interactive claude skips first-run onboarding" \
   jq -e '.hasCompletedOnboarding == true' "$HOME/.claude.json"
 check "Claude Code answers on Opus 5.5 with the token from its settings (live call)" claude_answers
 
+echo "Harness"
+HERMES_DIR="$HOME/.hermes/hermes-agent"
+HERMES_COMMIT=$(sed -n 's/^HERMES_COMMIT=//p' \
+  "$SOURCE_DIR/home/.chezmoiscripts/run_once_after_50-install-hermes.sh")
+
+hermes_at_pin() {
+  [ -n "$HERMES_COMMIT" ] && [ "$(git -C "$HERMES_DIR" rev-parse HEAD)" = "$HERMES_COMMIT" ]
+}
+
+check "hermes is Hermes' own launcher for ~/.hermes/hermes-agent" \
+  grep -qF "$HERMES_DIR/venv/bin/python" "$HOME/.local/bin/hermes"
+check "Hermes is at the commit pinned in apply script 50" hermes_at_pin
+check "Hermes' installer completed at that commit" \
+  jq -e --arg c "$HERMES_COMMIT" '.pinnedCommit == $c' "$HERMES_DIR/.hermes-bootstrap-complete"
+check "hermes runs" hermes --version
+check "Hermes' installer left the shell startup files alone" \
+  bash -c '! grep -qsF "# Hermes Agent" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"'
+
 echo "Git identity and signing"
 check "git email is the agent email" \
   test "$(git config --global user.email)" = "$CHEZMOI_AGENT_EMAIL"

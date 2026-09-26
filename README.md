@@ -1,6 +1,6 @@
 # Dotfiles
 
-The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
+The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the Hermes agent harness install, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
 
 **Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
@@ -75,6 +75,7 @@ himalaya envelope list       # the agent's inbox (password read from 1Password p
 codex login --device-auth    # once: the owner approves the code with the ChatGPT subscription
 codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
 claude -p "..."              # Opus 5.5 on the subscription token
+hermes --version             # Hermes Agent, at the release pinned in apply script 50
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.

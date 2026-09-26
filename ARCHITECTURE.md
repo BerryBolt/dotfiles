@@ -18,7 +18,7 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; the agent harness and other services; further integrations; and safe resumption belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the Hermes agent harness installed at a pinned release, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; Hermes' configuration, its service, and other services; further integrations; and safe resumption belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
@@ -62,8 +62,11 @@ The current implementation does not yet start services or configure integrations
 | Script 20 | `run_after_20-passwordless-sudo.sh.tmpl` | Ensures `/etc/sudoers.d/05-dotfiles-nopasswd` (root:root 0440) grants the account `NOPASSWD: ALL`. While sudo still asks for a password, it pipes the `op_account_item` password to `sudo -S` to install the rule, validating it with `visudo` before it takes effect. It fails if sudo still needs a password afterwards. The file sorts after the installer's per-user rule and before Omarchy's narrower rules. |
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
 | Script 40 | `run_once_after_40-install-system-packages.sh` | Installs system packages with Omarchy's commands: `himalaya` from Arch's repositories, and Brave through `omarchy-install-browser` (AUR, Omarchy's flags and theme policy), then makes it the default browser. Reruns when the script changes. |
+| Script 50 | `run_once_after_50-install-hermes.sh` | Installs Hermes Agent with Hermes' own installer at the commit pinned in the script: a git checkout in `~/.hermes/hermes-agent` with its own Python environment, and the `hermes` command in `~/.local/bin`. Runs only the installer's unattended stages, so it never starts the setup wizard or offers the gateway service, and fails unless the checkout ends at the pin. Reruns when the script changes. |
 
 `codex` and `claude` come from Omarchy's on-demand launchers, which install them through mise on first use; this repository declares only their settings. Both settings files are extended rather than owned because each CLI also writes its own choices there: the merge templates set the declared keys and keep the rest. `~/.claude.json` is Claude Code's runtime state, which it rewrites on every launch; its template adds only the onboarding flag and otherwise leaves the file byte for byte.
+
+Hermes comes from its own installer rather than Omarchy's route ([dependencies](policies/dependencies.md)). The installer uses Omarchy's Node and tools, finds `~/.local/bin` already on `PATH`, and so leaves shell startup files and system packages alone. When they are missing, it seeds `~/.hermes/config.yaml`, `.env`, and `SOUL.md` from its templates; this repository does not manage them yet.
 
 In Omarchy's interactive Bash, `op`, `with-op`, and `chezmoi-with-op` are available. Omarchy puts `~/.local/bin` and the mise shims on `PATH` for login and SSH shells; both wrappers also prepend those directories themselves for stripped-`PATH` callers. Non-interactive callers use `with-op op ...` because the `op()` function exists only in interactive shells.
 
@@ -79,7 +82,7 @@ Pinned GitHub host keys establish trust before authenticated Git operations. Git
 
 Keep install steps distinct from state restoration:
 
-- `run_once_after_` suits installs tied to a manifest. Script 10 embeds the manifest hash so changes to that separate file retrigger installation.
+- `run_once_after_` suits installs tied to a manifest. Script 10 embeds the manifest hash so changes to that separate file retrigger installation. Script 50 keeps its pin in the script itself, so changing the pin reruns it.
 - `run_after_` is required for SSH and sudo state that must be restored even when the script content has not changed.
 - Required dependency, credential, key, and authentication failures stop the operation.
 
@@ -98,7 +101,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Validation
 
-- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, system packages and tools, mail login (IMAP, and SMTP with a `NOOP` that sends nothing), the agent CLIs (Claude Code's settings and their 0600 mode, its onboarding flag, and one live call each that proves the Codex ChatGPT login and that Claude Code finds its token with none in the environment and answers on its default model), credential scope and permissions, identity and local commit signing, key and host trust (GitHub SSH offers only the agent's key), SSH source sync, managed-file drift, and the workspace checkout's origin and SSH access.
+- `tests/assertions.sh` runs on the installed Omarchy account with live 1Password and GitHub access. It checks the Bash integration (interactive and login shells), passwordless sudo, system packages and tools, mail login (IMAP, and SMTP with a `NOOP` that sends nothing), the agent CLIs (Claude Code's settings and their 0600 mode, its onboarding flag, and one live call each that proves the Codex ChatGPT login and that Claude Code finds its token with none in the environment and answers on its default model), the Hermes install (its own launcher, the checkout at the pin, a completed installer run, and untouched shell startup files), credential scope and permissions, identity and local commit signing, key and host trust (GitHub SSH offers only the agent's key), SSH source sync, managed-file drift, and the workspace checkout's origin and SSH access.
 - `tests/recovery.sh` runs on a disposable installed account. It proves the recovery paths above: a deleted key, a previous (fixture) key being replaced, a deleted sudo rule restored with the account password from 1Password, and a deleted env file restored from a token supplied on stdin.
 
 Acceptance happens on a disposable Omarchy VM that installs a pushed candidate from the public GitHub repository: the installer is downloaded from `raw.githubusercontent.com/.../<sha>/install.sh` and run with `--revision <sha>`, so the installer and the applied source are the same commit on fresh and repeat installs. Machine access and private operational context stay in ignored local inputs.
