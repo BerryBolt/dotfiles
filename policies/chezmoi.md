@@ -29,7 +29,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── dot_claude/              # modify template for settings.json (0600)
 │   ├── dot_codex/               # modify template for config.toml
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/
-│   └── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
+│   ├── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
+│   └── private_dot_ssh/         # modify_private_config: GitHub block in ~/.ssh/config
 ├── policies/
 ├── runbooks/
 ├── skills/
@@ -39,6 +40,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 ### Extending files that others also write
 
 `~/.bashrc` belongs to Omarchy's defaults and the user. `home/modify_dot_bashrc` is a chezmoi [modify script](https://www.chezmoi.io/reference/target-types/#scripts): chezmoi passes the current file on stdin and writes back its stdout. The script keeps every existing byte and maintains exactly one block between `# >>> dotfiles >>>` and `# <<< dotfiles <<<`, replacing it in place when its content changes. It fails, rather than guessing, when `~/.bashrc` is missing or the markers are damaged.
+
+`home/private_dot_ssh/modify_private_config` applies the same approach to `~/.ssh/config`, which may be absent. Its block goes first because ssh uses the first value it finds, and it ends with `Host *` so any global options below it still apply to every host.
 
 mise supports layered configuration, so the bootstrap tools live in `~/.config/mise/conf.d/dotfiles.toml` and the user's `~/.config/mise/config.toml` is never written.
 

@@ -177,6 +177,11 @@ check "allowed_signers matches the on-disk key" \
 check "known_hosts pins exactly the repo's GitHub keys" \
   cmp -s <(grep '^github\.com ' "$HOME/.ssh/known_hosts") \
   <(grep '^github\.com ' "$HOME/.local/share/ssh-bootstrap/github_known_hosts")
+check "~/.ssh/config is 600 with exactly one dotfiles block" \
+  bash -c '[ "$(stat -c %a "$1")" = 600 ] && [ "$(grep -cx "# >>> dotfiles >>>" "$1")" -eq 1 ]' _ "$HOME/.ssh/config"
+check "GitHub SSH offers only the agent's key, never another agent's" \
+  bash -c 'g=$(ssh -G github.com) && grep -qx "identitiesonly yes" <<<"$g" &&
+    [ "$(grep "^identityfile " <<<"$g")" = "identityfile ~/.ssh/id_ed25519" ]'
 
 github_greets_handle() {
   local out

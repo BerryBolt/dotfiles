@@ -1,0 +1,50 @@
+#!/bin/bash
+# chezmoi modify script for ~/.ssh/config: keep the user's entries and
+# maintain one marked block at the top that makes GitHub SSH use only the
+# agent's own key. chezmoi passes the current file (empty if absent) on stdin
+# and writes stdout back.
+
+set -euo pipefail
+
+begin='# >>> dotfiles >>>'
+end='# <<< dotfiles <<<'
+
+# ssh uses the first value it finds, so the block goes first. The trailing
+# `Host *` returns any global options that follow to all hosts.
+block=$(cat <<'BLOCK'
+# >>> dotfiles >>>
+# Managed by the dotfiles chezmoi source; edit it there, not here.
+# GitHub sees only the agent's own key. Keys in a forwarded or local SSH
+# agent are never offered, so they cannot change the account it acts as.
+Host github.com
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+Host *
+# <<< dotfiles <<<
+BLOCK
+)
+
+# Preserve the input byte-for-byte, including trailing newlines.
+current=$(cat; printf x)
+current=${current%x}
+
+begins=$(grep -cxF -- "$begin" <<<"$current" || true)
+ends=$(grep -cxF -- "$end" <<<"$current" || true)
+
+if [[ "$begins" -eq 0 && "$ends" -eq 0 ]]; then
+    printf '%s\n' "$block"
+    if [[ -n "$current" ]]; then
+        printf '\n%s' "$current"
+        [[ "$current" == *$'\n' ]] || printf '\n'
+    fi
+elif [[ "$begins" -eq 1 && "$ends" -eq 1 ]]; then
+    # Replace the existing block in place so surrounding user edits stay put.
+    printf '%s' "$current" | BLOCK="$block" awk -v b="$begin" -v e="$end" '
+        $0 == b { print ENVIRON["BLOCK"]; skip = 1; next }
+        skip && $0 == e { skip = 0; next }
+        !skip { print }
+    '
+else
+    echo "error: ~/.ssh/config has an incomplete or repeated dotfiles block ($begin / $end). Fix it by hand and re-apply." >&2
+    exit 1
+fi
