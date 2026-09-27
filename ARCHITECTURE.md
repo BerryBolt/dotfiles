@@ -32,14 +32,15 @@ Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies
 
 ## Bootstrap flow
 
-1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything. The installer itself never installs system packages; apply script 40 does, once sudo is passwordless.
+1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything. The installer itself never installs system packages; apply script 40 does, once sudo is passwordless, and Omarchy's update (step 7) upgrades them.
 2. **Inputs.** It collects the account name, email, GitHub handle, workspace repository (`owner/name`), vault, SSH key item, workstation account item, and service-account token from the environment or prompts. `--non-interactive` requires every input from the environment. The token is never displayed.
 3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, the SSH key item is readable, and the workstation account item names the installing account. While sudo still asks for a password, it also checks the item's password against sudo. Bad credentials fail here, before any configuration is written.
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
 5. **Apply.** `chezmoi init --apply` renders the config from the collected inputs (no further prompts), persists non-secret data, and applies the managed files and scripts below.
 6. **Workspace.** Once apply has restored the SSH key and pinned GitHub's host keys, the installer clones `git@github.com:<owner/name>.git` into `~/brain`. An existing checkout there belongs to the agent and is left as is; anything else at that path stops the installer. A failed clone stops it with an error, and rerunning the installer retries the clone.
+7. **Omarchy update.** When a person is at the terminal (no `--non-interactive`, a TTY present), the installer finishes with `omarchy-update`, the update Omarchy's first-run notification offers, reading answers from the terminal. It asks before it starts and may offer to remove orphaned packages or to reboot; those prompts ignore `-y` in Omarchy 4.0.4 and never return without a person, so an unattended run leaves the update to the operator and says so. The update runs in Omarchy's environment (its `env-bootstrap` sets `OMARCHY_PATH`) and without the service-account token. A failed update stops the installer with an error.
 
-The current implementation does not yet start services or configure integrations beyond mail and the agent CLIs. Those arrive as later increments of this repository. The workspace clone is an installer step, not part of apply: reapply never reads or changes `~/brain`, and runtime state is not restored.
+The current implementation does not yet start services or configure integrations beyond mail and the agent CLIs. Those arrive as later increments of this repository. The workspace clone and the Omarchy update are installer steps, not part of apply: reapply never reads or changes `~/brain` and never updates Omarchy, and runtime state is not restored.
 
 ## Managed state
 
@@ -114,7 +115,7 @@ Acceptance happens on a disposable Omarchy VM that installs a pushed candidate f
 2. Build on Omarchy: keep its shell initialization and updates working, prefer its supported commands, and extend files it or other tools also write. Only files listed in Managed state are owned outright.
 3. Keep secrets out of Git and out of the parent interactive shell environment.
 4. Every required bootstrap step either succeeds or exits with a clear error.
-5. After installer input collection, template rendering and apply do not introduce further prompts.
+5. After installer input collection, template rendering and apply do not introduce further prompts. The only later prompts are Omarchy's own, from the update that ends an attended install.
 6. Reapply is safe, converges without drift, and does not depend on the workspace repository or on runtime state.
 7. SSH restoration remains an ensure-state operation; source sync does not fall back to HTTPS.
 8. Removing source management does not authorize deleting existing user data, uninstalling tools, or destroying a workspace.

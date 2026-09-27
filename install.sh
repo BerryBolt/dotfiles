@@ -564,6 +564,28 @@ GitHub account $AGENT_HANDLE_GITHUB needs read access to it. Grant it and re-run
   fi
 }
 
+# Finish with Omarchy's own update, the one its first-run notification offers.
+# It asks before starting and may ask to remove orphans or reboot, even with
+# -y, so it runs only when a person is at the terminal, and reads the answers
+# from there because stdin may be the piped installer. Omarchy's env-bootstrap
+# sets the OMARCHY_PATH its update steps need; the service-account token stays
+# out of the update and the package builds it runs.
+update_omarchy() {
+  if [ -n "$NONINTERACTIVE" ] || ! has_tty; then
+    log_info "Unattended run: Omarchy was not updated. Run omarchy-update in a terminal."
+    return
+  fi
+
+  log_info "Setup applied. Updating Omarchy with omarchy-update..."
+  if ! (
+    unset OP_SERVICE_ACCOUNT_TOKEN
+    . /usr/share/omarchy/default/bash/env-bootstrap
+    exec omarchy-update
+  ) < "$TTY_DEV"; then
+    log_error "omarchy-update failed. Review its output (also in /tmp/omarchy-update.log), fix the cause, and run omarchy-update again."
+  fi
+}
+
 bootstrap_main() {
   repo=${1:-}
 
@@ -596,6 +618,7 @@ bootstrap_main() {
   fi
 
   clone_workspace
+  update_omarchy
 
   echo ""
   log_success "Bootstrap complete"

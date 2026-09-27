@@ -49,6 +49,8 @@ The source comes from `https://github.com/<GitHub handle>/dotfiles.git`, on its 
 
 After the apply has restored the SSH key, the installer clones the workspace repository into `~/brain` over SSH. When `~/brain` is already a checkout, it leaves it as is.
 
+An install run from a terminal ends with Omarchy's own update, `omarchy-update`, the one Omarchy's first-run notification offers. It asks before it starts and may offer a reboot when it finishes; the setup is already applied by then. A `--non-interactive` run, or one without a terminal, leaves the update for you to run.
+
 ### Install an exact revision
 
 To test a pushed commit, fetch the installer and apply the source from the same full SHA:
