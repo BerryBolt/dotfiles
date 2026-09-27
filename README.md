@@ -18,6 +18,7 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - A Server item in that vault with the account's OS login: `username` (the installing account) and `password`. The installer selects it by title or item ID (`CHEZMOI_OP_ACCOUNT_ITEM`). Setup pipes the password to sudo once to grant the account passwordless sudo, because the agent administers its own VM unattended.
 - A `Claude Code - OAuth token` API Credential item in that vault, holding a token the subscription owner created with `claude setup-token`. Apply writes it into Claude Code's settings.
 - A `Telegram Bot - API key` API Credential item in that vault, with the bot token (`credential`) and the owner's Telegram user ID (`owner user ID`). Apply writes both into Hermes' settings.
+- A `Brave Search - API key` API Credential item in that vault, with a Brave Search API key (`credential`). Hermes uses it for web search.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 

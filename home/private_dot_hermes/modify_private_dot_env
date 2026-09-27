@@ -16,6 +16,8 @@
 {{- $declared = set $declared "TELEGRAM_BOT_TOKEN" (onepasswordRead (printf "%s/credential" $telegram)) -}}
 {{- $declared = set $declared "TELEGRAM_ALLOWED_USERS" $owner -}}
 {{- $declared = set $declared "TELEGRAM_HOME_CHANNEL" $owner -}}
+{{- /* Web search through Brave (web.backend in config.yaml). */ -}}
+{{- $declared = set $declared "BRAVE_SEARCH_API_KEY" (onepasswordRead (printf "op://%s/Brave Search - API key/credential" .op_vault)) -}}
 {{- range $name, $value := $declared -}}
 {{-   $line := printf "%s=%s" $name $value -}}
 {{-   $pattern := printf "(?m)^%s=.*$" $name -}}

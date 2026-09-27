@@ -33,6 +33,8 @@
 {{- $declared = set $declared "platform_toolsets.telegram" (list "browser" "clarify" "code_execution" "connections" "cronjob" "delegation" "file" "image_gen" "skills" "terminal" "todo" "tts" "vision" "web") -}}
 {{- $declared = set $declared "image_gen.provider" "openai-codex" -}}
 {{- $declared = set $declared "image_gen.model" "gpt-image-2-medium" -}}
+{{- /* Web search through Brave's free plan; the key is in ~/.hermes/.env. */ -}}
+{{- $declared = set $declared "web.backend" "brave-free" -}}
 {{- $declared = set $declared "browser.cloud_provider" "local" -}}
 {{- $converged := true -}}
 {{- range $path, $value := $declared -}}

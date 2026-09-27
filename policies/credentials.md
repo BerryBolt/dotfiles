@@ -59,7 +59,7 @@ Hermes reaches Codex through its own device login in `~/.hermes/auth.json`, not 
 - MUST NOT import the Codex CLI credentials into Hermes. The setup wizard offers it; answer no. The declared config also sets `auth.adopt_external_logins: false`, so Hermes never borrows the CLI's login on its own when its session needs repair.
 - The Codex rules above apply to Hermes' login as well: never copy `auth.json`, and report a revoked login to the owner instead of signing in again.
 
-Apply writes Hermes' Telegram settings into `~/.hermes/.env` (mode 0600), which Hermes reads whoever starts it: the bot token from the `Telegram Bot - API key` item's `credential` field, and the owner's Telegram user ID from its `owner user ID` field, as both the only allowed user and the home chat for deliveries. Hermes and its setup wizard write other lines to the file; apply keeps them.
+Apply writes Hermes' Telegram settings into `~/.hermes/.env` (mode 0600), which Hermes reads whoever starts it: the bot token from the `Telegram Bot - API key` item's `credential` field, and the owner's Telegram user ID from its `owner user ID` field, as both the only allowed user and the home chat for deliveries; and the Brave Search API key for web search from the `Brave Search - API key` item's `credential` field. Hermes and its setup wizard write other lines to the file; apply keeps them.
 
 ## Environment setup
 

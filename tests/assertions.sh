@@ -182,6 +182,15 @@ telegram_bot_answers() {
     curl -fsS -K - | jq -e '.ok and .result.is_bot' >/dev/null
 }
 
+brave_search_answers() {
+  local key
+  key=$(sed -n 's/^BRAVE_SEARCH_API_KEY=//p' "$HOME/.hermes/.env")
+  [ -n "$key" ] &&
+    printf 'header = "X-Subscription-Token: %s"\nurl = "%s"\n' "$key" \
+      "https://api.search.brave.com/res/v1/web/search?q=omarchy&count=1" |
+    curl -fsS -K - | jq -e '.web.results | length > 0' >/dev/null
+}
+
 check "hermes is Hermes' own launcher for ~/.hermes/hermes-agent" \
   grep -qF "$HERMES_DIR/venv/bin/python" "$HOME/.local/bin/hermes"
 check "Hermes is at the commit pinned in apply script 50" hermes_at_pin
@@ -196,6 +205,7 @@ check "Hermes has its own Codex sign-in" \
   bash -c 'hermes auth status openai-codex 2>&1 | grep -qx "openai-codex: logged in"'
 check "Hermes answers on GPT-6 Luna through the subscription (live call)" hermes_answers
 check "the Telegram bot token in ~/.hermes/.env is live (getMe)" telegram_bot_answers
+check "the Brave Search key in ~/.hermes/.env answers a query" brave_search_answers
 
 echo "Git identity and signing"
 check "git email is the agent email" \
