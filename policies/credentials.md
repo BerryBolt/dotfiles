@@ -39,7 +39,7 @@ Every Codex process on the workstation shares the one login in `~/.codex/auth.js
 - MUST NOT copy `auth.json` to another machine or `CODEX_HOME`. A second machine gets its own device login.
 - MUST sign in or out only while no other Codex process runs.
 - On a "refresh token already used" or "revoked" error, MUST stop Codex work and report it to the owner instead of signing in again.
-- MUST NOT give a process that runs Codex `CODEX_API_KEY` or `OPENAI_API_KEY`. The managed config allows only the ChatGPT login, so a run never bills the API. With `CODEX_API_KEY` set, `codex exec` treats the key as the login in use, reports the conflict, and deletes the ChatGPT login.
+- MUST NOT give a process that runs Codex `CODEX_API_KEY` or `OPENAI_API_KEY`. The managed config allows only the ChatGPT login, so a run never bills the API. With `CODEX_API_KEY` set, `codex exec` treats the key as the login in use, reports the conflict, and deletes the ChatGPT login. The Hermes gateway's unit drop-in unsets both.
 
 ### Claude Code
 

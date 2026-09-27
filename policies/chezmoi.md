@@ -29,7 +29,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── dot_claude/              # modify template for settings.json (0600)
 │   ├── dot_codex/               # modify template for config.toml
 │   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600)
-│   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/
+│   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/, systemd/user/ (gateway drop-in)
 │   ├── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
 │   └── private_dot_ssh/         # modify_private_config: GitHub block in ~/.ssh/config
 ├── policies/
@@ -48,7 +48,7 @@ mise supports layered configuration, so the bootstrap tools live in `~/.config/m
 
 Codex and Claude Code write their own choices into `~/.codex/config.toml` and `~/.claude/settings.json`. Their sources are chezmoi [modify templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file) (`chezmoi:modify-template`): each parses the current file from `.chezmoi.stdin`, sets the declared keys with `setValueAtPath`, and writes the result, so every other key survives. An unparsable file fails the apply. Add a setting by adding a `setValueAtPath` line; a choice the agent made live in the CLI is captured the same way. `~/.claude.json` is Claude Code's runtime state rather than settings, so its modify template sets only the onboarding flag and, once the flag is set, returns the file unchanged.
 
-Hermes writes `~/.hermes/config.yaml` the same way (its setup wizard, `/model`, `hermes config set`), and its modify template follows the same pattern with one difference: the file is YAML with Hermes' comments, and re-serializing it drops them and sorts the keys. So the template first checks the declared keys and, when all of them already have their values, returns the file unchanged; it rewrites the file only when a declared value differs. Hermes reads the file when it starts, so restart a running Hermes after an apply changes it. `~/.hermes/.env` is a `KEY=value` file; its template replaces or appends the declared lines and keeps the rest.
+Hermes writes `~/.hermes/config.yaml` the same way (its setup wizard, `/model`, `hermes config set`), and its modify template follows the same pattern with one difference: the file is YAML with Hermes' comments, and re-serializing it drops them and sorts the keys. So the template first checks the declared keys and, when all of them already have their values, returns the file unchanged; it rewrites the file only when a declared value differs. Hermes reads the file when it starts; apply script 60 restarts the gateway when the declared settings change. `~/.hermes/.env` is a `KEY=value` file; its template replaces or appends the declared lines and keeps the rest.
 
 ### `private_` prefix and directory permissions
 
@@ -203,5 +203,6 @@ Templates that call `onepasswordRead` render only through `chezmoi-with-op` (or 
 
 - Location: `home/.chezmoiscripts/`
 - `run_once_after_<order>-<name>.sh.tmpl`: runs once per content hash. Embed a manifest hash when a separate file should retrigger it (script 10).
+- `run_onchange_after_<order>-<name>.sh.tmpl`: runs when its rendered content changes. Embed the hashes of the files and values it acts on (script 60).
 - `run_after_<order>-<name>.sh.tmpl`: runs on every apply. Use it for ensure-state work that must repair drift even when the script is unchanged (scripts 20 and 30). Because they always run, `chezmoi-with-op diff` and `status` always list them, even on a converged machine; add `--exclude=scripts` to check managed files alone.
 - Scripts fail on missing dependencies, credentials, or keys; they do not skip silently.

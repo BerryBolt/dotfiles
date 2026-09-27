@@ -208,6 +208,27 @@ check "Hermes answers on GPT-6 Luna through the subscription (live call)" hermes
 check "the Telegram bot token in ~/.hermes/.env is live (getMe)" telegram_bot_answers
 check "the Brave Search key in ~/.hermes/.env answers a query" brave_search_answers
 
+# The gateway records its own state. An apply restarts it in the background,
+# so allow it time to reconnect.
+gateway_connected() {
+  local _
+  for _ in $(seq 1 60); do
+    jq -e --arg c "$HERMES_COMMIT" --argjson pid "$(systemctl --user show hermes-gateway.service --property=MainPID --value)" \
+      '.pid == $pid and .gateway_state == "running" and .platforms.telegram.state == "connected" and .code_sha == $c' \
+      "$HOME/.hermes/gateway_state.json" >/dev/null 2>&1 && return 0
+    sleep 3
+  done
+  return 1
+}
+
+check "the Hermes gateway service is enabled and running" \
+  bash -c 'systemctl --user is-enabled --quiet hermes-gateway.service && systemctl --user is-active --quiet hermes-gateway.service'
+check "the gateway unit carries this repo's drop-in" \
+  bash -c 'systemctl --user show hermes-gateway.service --property=DropInPaths --value | grep -q "hermes-gateway.service.d/dotfiles.conf"'
+check "lingering keeps the gateway running without a login" \
+  test "$(loginctl show-user "$(id -un)" --property=Linger --value)" = yes
+check "the gateway runs the pinned Hermes and is connected to Telegram" gateway_connected
+
 echo "Git identity and signing"
 check "git email is the agent email" \
   test "$(git config --global user.email)" = "$CHEZMOI_AGENT_EMAIL"

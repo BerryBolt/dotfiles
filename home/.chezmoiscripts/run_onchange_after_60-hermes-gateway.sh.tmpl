@@ -1,0 +1,40 @@
+#!/bin/bash
+# The Hermes gateway runs as Hermes' own systemd user service, extended by
+# this repository's drop-in, with lingering so it runs without a login and
+# starts at boot. Runs again when Hermes' install, its declared settings and
+# their 1Password values, or the drop-in change, and restarts a running
+# gateway so it loads them. See ARCHITECTURE.md "Managed state".
+# install: {{ include ".chezmoiscripts/run_once_before_50-install-hermes.sh" | sha256sum }}
+# config: {{ include "private_dot_hermes/modify_private_config.yaml" | sha256sum }}
+# env: {{ include "private_dot_hermes/modify_private_dot_env" | sha256sum }}
+# values: {{ list (onepasswordRead (printf "op://%s/Telegram Bot - API key/credential" .op_vault)) (onepasswordRead (printf "op://%s/Telegram Bot - API key/owner user ID" .op_vault)) (onepasswordRead (printf "op://%s/Brave Search - API key/credential" .op_vault)) | join "\n" | sha256sum }}
+# drop-in: {{ include "dot_config/systemd/user/hermes-gateway.service.d/dotfiles.conf" | sha256sum }}
+
+set -euo pipefail
+
+# Hermes writes the Node directory it finds on PATH into the unit; mise's
+# shims keep that entry valid when Omarchy upgrades Node.
+export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+service=hermes-gateway.service
+user="$(id -un)"
+
+if [ ! -e "$HOME/.config/systemd/user/$service" ]; then
+    # A new workstation starts paused (safe resumption): the gateway connects,
+    # but takes no new turns and runs no cron jobs until `hermes resume`, once
+    # pending work has been checked.
+    hermes pause --reason "New workstation: check pending work, then run hermes resume."
+    hermes gateway install --start-on-login --no-start-now
+fi
+if [ "$(loginctl show-user "$user" --property=Linger --value)" != yes ]; then
+    sudo -n loginctl enable-linger "$user"
+fi
+systemctl --user daemon-reload
+systemctl --user enable --quiet "$service"
+if systemctl --user is-active --quiet "$service"; then
+    # A graceful restart waits for turns in progress. It runs in the
+    # background, so an apply started from a gateway turn can finish that turn.
+    systemd-run --user --collect --quiet --setenv=PATH="$PATH" "$HOME/.local/bin/hermes" gateway restart
+    echo "The Hermes gateway restarts once its turns in progress finish."
+else
+    hermes gateway start
+fi
