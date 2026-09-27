@@ -81,7 +81,6 @@ codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
 claude -p "..."              # Opus 5.5 on the subscription token
 hermes setup model           # once: Hermes' own Codex sign-in (decline importing the CLI's); the owner approves the code
 hermes -z "..."               # GPT-6 Luna through Hermes' own sign-in, at the release pinned in apply script 50
-hermes resume                # after a fresh install: the Telegram gateway starts paused until pending work is checked
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.

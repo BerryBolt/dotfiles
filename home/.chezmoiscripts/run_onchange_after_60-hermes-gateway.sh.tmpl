@@ -19,10 +19,6 @@ service=hermes-gateway.service
 user="$(id -un)"
 
 if [ ! -e "$HOME/.config/systemd/user/$service" ]; then
-    # A new workstation starts paused (safe resumption): the gateway connects,
-    # but takes no new turns and runs no cron jobs until `hermes resume`, once
-    # pending work has been checked.
-    hermes pause --reason "New workstation: check pending work, then run hermes resume."
     hermes gateway install --start-on-login --no-start-now
 fi
 if [ "$(loginctl show-user "$user" --property=Linger --value)" != yes ]; then

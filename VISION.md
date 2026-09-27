@@ -28,7 +28,7 @@ Everything the agent writes has one of four homes: setup in this repository, con
 - **Full guest authority.** The agent administers its own VM, including system packages and services. Installs declared here run through the package manager, not ad hoc.
 - **Scoped credentials.** Tokens reach only the process that needs them. Nothing secret is committed.
 - **Fail clearly.** Required steps succeed or stop with an actionable error; no silent skips or protocol fallbacks.
-- **Safe resumption.** When managed services exist, a restored workstation starts with outbound automation paused until pending work has been checked against external services.
+- **Safe resumption.** A restored workstation starts its services live; scheduled work resumes only after its pending work has been checked against external services.
 
 ## Delivery
 

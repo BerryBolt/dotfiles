@@ -18,7 +18,7 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the Hermes agent harness at a pinned release with its model, tool, and Telegram settings and its gateway service, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; other services; and further integrations belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the Hermes agent harness at a pinned release with its model, tool, and Telegram settings and its gateway service, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; other services; scheduled work and its safe resumption; and further integrations belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
@@ -68,7 +68,7 @@ Apply starts one service, the Hermes gateway, and configures no integrations bey
 | Script 30 | `run_after_30-restore-ssh-key.sh.tmpl` | Restores or validates `~/.ssh/id_ed25519` against the `op_ssh_item` item, refreshes pinned GitHub `known_hosts` entries, and switches an HTTPS GitHub source remote to SSH. |
 | Script 40 | `run_once_after_40-install-system-packages.sh` | Installs system packages with Omarchy's commands: `himalaya` from Arch's repositories, and Brave through `omarchy-install-browser` (AUR, Omarchy's flags and theme policy), then makes it the default browser. Reruns when the script changes. |
 | Script 50 | `run_once_before_50-install-hermes.sh` | Installs Hermes Agent with Hermes' own installer at the commit pinned in the script: a git checkout in `~/.hermes/hermes-agent` with its own Python environment, and the `hermes` command in `~/.local/bin`. Runs only the installer's unattended stages, so it never starts the setup wizard or offers the gateway service, and fails unless the checkout ends at the pin. Runs before files are applied, so the installer has seeded `~/.hermes/config.yaml` and `.env` for the templates that extend them. Reruns when the script changes. |
-| Script 60 | `run_onchange_after_60-hermes-gateway.sh.tmpl` | Installs the Hermes gateway as Hermes' own systemd user service (`hermes gateway install`) when it is missing, enables it, and ensures lingering, so it runs without a login and starts at boot. A new service starts paused (see [Safe resumption](#safe-resumption)); a running one is restarted gracefully in the background, after its turns in progress, so it loads what changed. Runs again when Hermes' install script, its settings templates, their 1Password values, or the drop-in change. |
+| Script 60 | `run_onchange_after_60-hermes-gateway.sh.tmpl` | Installs the Hermes gateway as Hermes' own systemd user service (`hermes gateway install`) when it is missing, enables it, and ensures lingering, so it runs without a login and starts at boot. A running gateway is restarted gracefully in the background, after its turns in progress, so it loads what changed. Runs again when Hermes' install script, its settings templates, their 1Password values, or the drop-in change. |
 
 `codex` and `claude` come from Omarchy's on-demand launchers, which install them through mise on first use; this repository declares only their settings. Both settings files are extended rather than owned because each CLI also writes its own choices there: the merge templates set the declared keys and keep the rest. `~/.claude.json` is Claude Code's runtime state, which it rewrites on every launch; its template adds only the onboarding flag and otherwise leaves the file byte for byte.
 
@@ -108,7 +108,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Safe resumption
 
-A new workstation's Hermes gateway starts paused. Before script 60 installs the service, it runs `hermes pause`, which writes `~/.hermes/ESTOP`: the gateway connects to Telegram but takes no new turns and runs no cron jobs. Check pending work against the systems the agent works in, then run `hermes resume`. Reapply on a workstation whose gateway is already installed never pauses it.
+A new workstation's Hermes gateway starts live: it takes Telegram turns as soon as it connects. The workstation runs no scheduled work yet, so nothing can repeat work done before a restore.
 
 ## Validation
 
