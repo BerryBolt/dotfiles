@@ -28,7 +28,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── dot_gitconfig.tmpl
 │   ├── dot_claude/              # modify template for settings.json (0600)
 │   ├── dot_codex/               # modify template for config.toml
-│   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600)
+│   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600), SOUL.md link
+│   ├── .chezmoiignore           # skips the SOUL.md link until ~/brain is cloned
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/, systemd/user/ (gateway drop-in)
 │   ├── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
 │   └── private_dot_ssh/         # modify_private_config: GitHub block in ~/.ssh/config

@@ -1,0 +1,10 @@
+{{- /*
+  Hermes' SOUL.md links to the workspace checkout's. Until install.sh has
+  cloned the workspace, the link would dangle, and Hermes replaces a dangling
+  SOUL.md link with its default persona when it starts. So apply leaves the
+  target alone until ~/brain/SOUL.md exists; install.sh applies it right
+  after the clone.
+*/ -}}
+{{ if not (stat (joinPath .chezmoi.homeDir "brain/SOUL.md")) -}}
+.hermes/SOUL.md
+{{ end -}}

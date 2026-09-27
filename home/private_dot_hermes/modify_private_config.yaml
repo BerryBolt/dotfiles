@@ -42,6 +42,13 @@
 {{- /* Web search through Brave's free plan; the key is in ~/.hermes/.env. */ -}}
 {{- $declared = set $declared "web.backend" "brave-free" -}}
 {{- $declared = set $declared "browser.cloud_provider" "local" -}}
+{{- /* The brain is the agent's home: gateway sessions start in it and read
+       its AGENTS.md, and skills load from its skills/, where skills the agent
+       creates are saved too, not in ~/.hermes, which a rebuild does not keep.
+       Absolute paths: Hermes passes terminal.cwd on unexpanded. */ -}}
+{{- $brain := joinPath .chezmoi.homeDir "brain" -}}
+{{- $declared = set $declared "terminal.cwd" $brain -}}
+{{- $declared = set $declared "skills.create_dir" (joinPath $brain "skills") -}}
 {{- $converged := true -}}
 {{- range $path, $value := $declared -}}
 {{-   $node := $config -}}

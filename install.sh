@@ -564,6 +564,15 @@ GitHub account $AGENT_HANDLE_GITHUB needs read access to it. Grant it and re-run
   fi
 }
 
+# Apply skips targets that point into the workspace while it is missing
+# (home/.chezmoiignore): Hermes' SOUL.md links to the checkout's. Apply them
+# now that the checkout exists; on a repeat install this changes nothing.
+apply_workspace_links() {
+  if ! with_bootstrap_tools chezmoi apply "$HOME/.hermes/SOUL.md"; then
+    log_error "chezmoi apply of ~/.hermes/SOUL.md failed"
+  fi
+}
+
 # Finish with Omarchy's own update, the one its first-run notification offers.
 # It asks before starting and may ask to remove orphans or reboot, even with
 # -y, so it runs only when a person is at the terminal, and reads the answers
@@ -618,6 +627,7 @@ bootstrap_main() {
   fi
 
   clone_workspace
+  apply_workspace_links
   update_omarchy
 
   echo ""
