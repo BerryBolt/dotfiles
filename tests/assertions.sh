@@ -90,6 +90,7 @@ check "chezmoi config does not persist the token" \
 echo "Sudo"
 SUDOERS_FILE=/etc/sudoers.d/05-dotfiles-nopasswd
 check "sudo runs without a password (rule, not a cached timestamp)" sudo -k -n true
+check "sudo -v passes without a password (omarchy-update runs it)" sudo -k -n -v
 check "sudoers rule is root:root 0440" \
   test "$(sudo -n stat -c '%a %U:%G' "$SUDOERS_FILE")" = "440 root:root"
 check "sudoers rule grants this account NOPASSWD: ALL" \
