@@ -1,8 +1,7 @@
 # User-level tools added by the dotfiles repo, only where Omarchy provides no
 # default (it supplies Git, OpenSSH, mise, and on-demand launchers such as gh).
-# Other entries in ~/.config/mise/config.toml stay user-owned. install.sh
-# installs these before the first apply; apply script 10 installs every tool
-# listed here.
+# Other entries in ~/.config/mise/config.toml stay user-owned. Apply script 10
+# installs every tool listed here.
 
 [tools]
 chezmoi = "latest"

@@ -6,15 +6,14 @@
   passes through byte for byte. Otherwise it is rewritten with the declared
   values, which drops the comments from Hermes' template and sorts the keys.
   Apply script 50 installs Hermes, which seeds this file, before files are
-  applied. Hermes reads the file when it starts: restart the gateway after
-  an apply changes it. See policies/credentials.md "Hermes".
+  applied. Hermes reads the file when it starts, so script 60 restarts the
+  gateway when it changes.
 */ -}}
 {{- if not .chezmoi.stdin -}}
 {{-   fail "~/.hermes/config.yaml is missing; Hermes' installer (apply script 50) seeds it" -}}
 {{- end -}}
 {{- $config := fromYaml .chezmoi.stdin -}}
 {{- $declared := dict -}}
-{{- /* GPT-6 Luna on high effort, through Hermes' own Codex sign-in. */ -}}
 {{- $declared = set $declared "model.provider" "openai-codex" -}}
 {{- $declared = set $declared "model.default" "gpt-6-luna" -}}
 {{- $declared = set $declared "model.base_url" "https://chatgpt.com/backend-api/codex" -}}

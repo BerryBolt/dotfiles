@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run one command with the 1Password service-account env loaded, without
-# exporting it to the calling shell. See policies/credentials.md.
+# exporting it to the calling shell.
 #
 #   with-op op whoami
 #   with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'

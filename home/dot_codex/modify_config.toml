@@ -2,13 +2,12 @@
 {{- /*
   Codex also writes ~/.codex/config.toml (model picks, notices, project
   trust), so this template merges the declared keys into the current file
-  and keeps everything else. See policies/credentials.md "Codex".
+  and keeps everything else.
 */ -}}
 {{- $config := dict -}}
 {{- if .chezmoi.stdin -}}
 {{-   $config = fromToml .chezmoi.stdin -}}
 {{- end -}}
-{{- /* GPT-6 Luna on high effort. */ -}}
 {{- $config = setValueAtPath "model" "gpt-6-luna" $config -}}
 {{- $config = setValueAtPath "model_reasoning_effort" "high" $config -}}
 {{- /* The subscription login only: a run never bills the API. */ -}}

@@ -3,7 +3,6 @@
   ~/.hermes/.env holds Hermes' secrets and platform settings. Hermes and its
   installer write it too, so this template sets the declared variables from
   1Password and keeps every other line. It holds tokens, so it is 0600.
-  See policies/credentials.md "Hermes".
 */ -}}
 {{- if not .chezmoi.stdin -}}
 {{-   fail "~/.hermes/.env is missing; Hermes' installer (apply script 50) seeds it" -}}

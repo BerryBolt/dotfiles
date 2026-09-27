@@ -575,7 +575,7 @@ apply_workspace_links() {
 
 # Sign in to Codex twice, for the CLI and for Hermes, whose own login keeps the
 # two from rotating each other's refresh token. These logins are the part of
-# the setup 1Password cannot hold (policies/credentials.md "Runtime sign-ins").
+# the setup 1Password cannot hold.
 # Each is a device login the owner approves, so it runs only when a person is
 # at the terminal, and only when that login is missing, so a repeat install
 # never replaces a working one. Hermes' `auth add` never offers to import the

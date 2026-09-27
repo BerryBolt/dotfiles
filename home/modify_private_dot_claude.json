@@ -6,7 +6,6 @@
   method although the token in ~/.claude/settings.json already signs it in.
   Once the key is set, the file passes through byte for byte, so chezmoi
   never reformats Claude Code's state or races its writes.
-  See policies/credentials.md "Claude Code".
 */ -}}
 {{- $state := dict -}}
 {{- if .chezmoi.stdin -}}

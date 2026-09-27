@@ -1,7 +1,6 @@
 #!/bin/bash
-# Install the tools declared in ~/.config/mise/conf.d/dotfiles.toml.
-# The sha below ties this run_once script's hash to the manifest so
-# edits propagate; see ARCHITECTURE.md "Apply scripts".
+# Install the tools declared in ~/.config/mise/conf.d/dotfiles.toml. The
+# manifest's hash below reruns this script when the manifest changes.
 # mise-manifest-sha: {{ include "dot_config/mise/conf.d/dotfiles.toml" | sha256sum }}
 {{- $tools := (include "dot_config/mise/conf.d/dotfiles.toml" | fromToml).tools }}
 

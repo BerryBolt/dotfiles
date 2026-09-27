@@ -3,7 +3,7 @@
 # this repository's drop-in, with lingering so it runs without a login and
 # starts at boot. Runs again when Hermes' install, its declared settings and
 # their 1Password values, or the drop-in change, and restarts a running
-# gateway so it loads them. See ARCHITECTURE.md "Managed state".
+# gateway so it loads them.
 # install: {{ include ".chezmoiscripts/run_once_before_50-install-hermes.sh" | sha256sum }}
 # config: {{ include "private_dot_hermes/modify_private_config.yaml" | sha256sum }}
 # env: {{ include "private_dot_hermes/modify_private_dot_env" | sha256sum }}

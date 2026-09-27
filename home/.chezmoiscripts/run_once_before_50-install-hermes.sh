@@ -3,7 +3,6 @@
 # pinned release: a git checkout in ~/.hermes/hermes-agent and the `hermes`
 # command in ~/.local/bin. Runs again when this file changes, so changing the
 # pin moves the install to that commit, forward or back.
-# See policies/dependencies.md.
 
 set -euo pipefail
 

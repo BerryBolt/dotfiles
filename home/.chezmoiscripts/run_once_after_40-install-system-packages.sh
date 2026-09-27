@@ -1,8 +1,7 @@
 #!/bin/bash
 # System packages this repo adds beyond Omarchy's base, installed with
-# Omarchy's package commands, which skip what is already present. Runs again
-# when this file changes. Needs the passwordless sudo from script 20.
-# See policies/dependencies.md.
+# Omarchy's package commands, which skip what is already present. Needs the
+# passwordless sudo from script 20.
 
 set -euo pipefail
 

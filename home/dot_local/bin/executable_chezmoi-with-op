@@ -1,7 +1,6 @@
 #!/bin/bash
 # Invoke chezmoi with the 1Password service-account token loaded for
 # template rendering, without exporting it to the parent shell.
-# See policies/chezmoi.md "Token-aware invocations".
 #
 # Token source, first match wins:
 #   1. OP_SERVICE_ACCOUNT_TOKEN supplied by the caller for this command.
