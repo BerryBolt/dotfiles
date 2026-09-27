@@ -33,6 +33,11 @@
 {{- $declared = set $declared "platform_toolsets.telegram" (list "browser" "clarify" "code_execution" "connections" "cronjob" "delegation" "file" "image_gen" "skills" "terminal" "todo" "tts" "vision" "web") -}}
 {{- $declared = set $declared "image_gen.provider" "openai-codex" -}}
 {{- $declared = set $declared "image_gen.model" "gpt-image-2-medium" -}}
+{{- /* Scan every command with the tirith from the mise manifest, and block
+       commands when the scanner is missing or fails, instead of running them
+       unscanned. */ -}}
+{{- $declared = set $declared "security.tirith_path" "~/.local/share/mise/shims/tirith" -}}
+{{- $declared = set $declared "security.tirith_fail_open" false -}}
 {{- /* Web search through Brave's free plan; the key is in ~/.hermes/.env. */ -}}
 {{- $declared = set $declared "web.backend" "brave-free" -}}
 {{- $declared = set $declared "browser.cloud_provider" "local" -}}

@@ -8,7 +8,7 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 | --- | --- | --- |
 | Omarchy base | Omarchy installation | Bash and its init, Git, OpenSSH, curl, mise, desktop and shell defaults |
 | Omarchy on-demand tools | Omarchy's `~/.local/bin` launchers | `gh`, codex, claude, copilot, and others; installed through mise on first use |
-| User-level tools Omarchy lacks | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`), `wrangler` (npm, on Omarchy's Node) |
+| User-level tools Omarchy lacks | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`), `wrangler` (npm, on Omarchy's Node), `tirith` (Hermes' command scanner) |
 | System packages | This repo: `run_once_after_40-install-system-packages.sh`, through Omarchy's package commands | `himalaya` (Arch `extra`, with `omarchy-pkg-add`), Brave (AUR, with `omarchy-install-browser`) |
 | Agent harness | This repo: `run_once_before_50-install-hermes.sh`, through Hermes' own installer at a pinned commit | Hermes Agent in `~/.hermes/hermes-agent`, `hermes` in `~/.local/bin` |
 

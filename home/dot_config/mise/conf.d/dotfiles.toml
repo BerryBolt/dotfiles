@@ -9,3 +9,7 @@ chezmoi = "latest"
 1password-cli = "latest"
 # Cloudflare's CLI, to deploy the agent's website. Runs on Omarchy's Node.
 "npm:wrangler" = "latest"
+# tirith, which Hermes runs on every command the agent executes. Installed
+# here so it is there from the first command: Hermes' own download can fail,
+# and ~/.hermes/config.yaml makes it fail closed.
+tirith = "latest"
