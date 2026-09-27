@@ -156,10 +156,30 @@ check "Claude Code answers on Opus 5.5 with the token from its settings (live ca
 echo "Harness"
 HERMES_DIR="$HOME/.hermes/hermes-agent"
 HERMES_COMMIT=$(sed -n 's/^HERMES_COMMIT=//p' \
-  "$SOURCE_DIR/home/.chezmoiscripts/run_once_after_50-install-hermes.sh")
+  "$SOURCE_DIR/home/.chezmoiscripts/run_once_before_50-install-hermes.sh")
 
 hermes_at_pin() {
   [ -n "$HERMES_COMMIT" ] && [ "$(git -C "$HERMES_DIR" rev-parse HEAD)" = "$HERMES_COMMIT" ]
+}
+
+# The usage file names the model and provider that answered and whether the
+# subscription covered the call.
+hermes_answers() {
+  (cd "$WORK" &&
+    timeout 300 hermes -z "$PROMPT" --usage-file "$WORK/hermes-usage.json" \
+      </dev/null >"$WORK/hermes-answer" 2>/dev/null) &&
+    answered_ok "$WORK/hermes-answer" &&
+    jq -e '.model == "gpt-6-luna" and .provider == "openai-codex" and .cost_status == "included"' \
+      "$WORK/hermes-usage.json" >/dev/null
+}
+
+# The token goes to Telegram on stdin, never on a command line.
+telegram_bot_answers() {
+  local token
+  token=$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$HOME/.hermes/.env")
+  [ -n "$token" ] &&
+    printf 'url = "https://api.telegram.org/bot%s/getMe"\n' "$token" |
+    curl -fsS -K - | jq -e '.ok and .result.is_bot' >/dev/null
 }
 
 check "hermes is Hermes' own launcher for ~/.hermes/hermes-agent" \
@@ -170,6 +190,12 @@ check "Hermes' installer completed at that commit" \
 check "hermes runs" hermes --version
 check "Hermes' installer left the shell startup files alone" \
   bash -c '! grep -qsF "# Hermes Agent" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"'
+check "~/.hermes/config.yaml and ~/.hermes/.env are 600 (.env holds tokens)" \
+  bash -c '[ "$(stat -c %a "$1/config.yaml")/$(stat -c %a "$1/.env")" = 600/600 ]' _ "$HOME/.hermes"
+check "Hermes has its own Codex sign-in" \
+  bash -c 'hermes auth status openai-codex 2>&1 | grep -qx "openai-codex: logged in"'
+check "Hermes answers on GPT-6 Luna through the subscription (live call)" hermes_answers
+check "the Telegram bot token in ~/.hermes/.env is live (getMe)" telegram_bot_answers
 
 echo "Git identity and signing"
 check "git email is the agent email" \

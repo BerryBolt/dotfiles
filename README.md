@@ -1,6 +1,6 @@
 # Dotfiles
 
-The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the Hermes agent harness install, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
+The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the Hermes agent harness with its settings, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
 
 **Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
@@ -17,10 +17,11 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - A `Purelymail` Login item in that vault with the agent's mailbox address (`username`) and password. Mail is configured from it.
 - A Server item in that vault with the account's OS login: `username` (the installing account) and `password`. The installer selects it by title or item ID (`CHEZMOI_OP_ACCOUNT_ITEM`). Setup pipes the password to sudo once to grant the account passwordless sudo, because the agent administers its own VM unattended.
 - A `Claude Code - OAuth token` API Credential item in that vault, holding a token the subscription owner created with `claude setup-token`. Apply writes it into Claude Code's settings.
+- A `Telegram Bot - API key` API Credential item in that vault, with the bot token (`credential`) and the owner's Telegram user ID (`owner user ID`). Apply writes both into Hermes' settings.
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-Installing needs no model sign-in or agent runtime; Claude Code works from the token item. The agent signs in to Codex afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
+Installing needs no model sign-in or agent runtime; Claude Code works from the token item. The agent signs in to Codex, and Hermes to Codex with its own login, afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
 
 ## Install
 
@@ -75,7 +76,8 @@ himalaya envelope list       # the agent's inbox (password read from 1Password p
 codex login --device-auth    # once: the owner approves the code with the ChatGPT subscription
 codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
 claude -p "..."              # Opus 5.5 on the subscription token
-hermes --version             # Hermes Agent, at the release pinned in apply script 50
+hermes setup model           # once: Hermes' own Codex sign-in (decline importing the CLI's); the owner approves the code
+hermes -z "..."               # GPT-6 Luna through Hermes' own sign-in, at the release pinned in apply script 50
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.

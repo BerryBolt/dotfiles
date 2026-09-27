@@ -10,7 +10,7 @@ What Omarchy supplies, and how this repo declares and installs everything else t
 | Omarchy on-demand tools | Omarchy's `~/.local/bin` launchers | `gh`, codex, claude, copilot, and others; installed through mise on first use |
 | User-level tools Omarchy lacks | This repo: `~/.config/mise/conf.d/dotfiles.toml` | `chezmoi`, 1Password CLI (`op`), `wrangler` (npm, on Omarchy's Node) |
 | System packages | This repo: `run_once_after_40-install-system-packages.sh`, through Omarchy's package commands | `himalaya` (Arch `extra`, with `omarchy-pkg-add`), Brave (AUR, with `omarchy-install-browser`) |
-| Agent harness | This repo: `run_once_after_50-install-hermes.sh`, through Hermes' own installer at a pinned commit | Hermes Agent in `~/.hermes/hermes-agent`, `hermes` in `~/.local/bin` |
+| Agent harness | This repo: `run_once_before_50-install-hermes.sh`, through Hermes' own installer at a pinned commit | Hermes Agent in `~/.hermes/hermes-agent`, `hermes` in `~/.local/bin` |
 
 - Everything the workstation needs MUST be declared in this repo and installed by apply or `install.sh`; nothing is installed by hand. The agent has full administrative rights in its VM, and setup grants its account passwordless sudo (ARCHITECTURE.md, script 20), so apply script 40 installs system packages unattended.
 - Install system packages with Omarchy's commands where one exists (`omarchy-install-browser`, `omarchy-pkg-add` for Arch repositories, `omarchy-pkg-aur-add` for the AUR). They skip what is already installed and apply Omarchy's settings for the package.

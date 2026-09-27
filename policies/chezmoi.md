@@ -28,6 +28,7 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── dot_gitconfig.tmpl
 │   ├── dot_claude/              # modify template for settings.json (0600)
 │   ├── dot_codex/               # modify template for config.toml
+│   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600)
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/
 │   ├── dot_local/               # bin/ wrappers, share/ssh-bootstrap/ pins
 │   └── private_dot_ssh/         # modify_private_config: GitHub block in ~/.ssh/config
@@ -46,6 +47,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 mise supports layered configuration, so the bootstrap tools live in `~/.config/mise/conf.d/dotfiles.toml` and the user's `~/.config/mise/config.toml` is never written.
 
 Codex and Claude Code write their own choices into `~/.codex/config.toml` and `~/.claude/settings.json`. Their sources are chezmoi [modify templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file) (`chezmoi:modify-template`): each parses the current file from `.chezmoi.stdin`, sets the declared keys with `setValueAtPath`, and writes the result, so every other key survives. An unparsable file fails the apply. Add a setting by adding a `setValueAtPath` line; a choice the agent made live in the CLI is captured the same way. `~/.claude.json` is Claude Code's runtime state rather than settings, so its modify template sets only the onboarding flag and, once the flag is set, returns the file unchanged.
+
+Hermes writes `~/.hermes/config.yaml` the same way (its setup wizard, `/model`, `hermes config set`), and its modify template follows the same pattern with one difference: the file is YAML with Hermes' comments, and re-serializing it drops them and sorts the keys. So the template first checks the declared keys and, when all of them already have their values, returns the file unchanged; it rewrites the file only when a declared value differs. Hermes reads the file when it starts, so restart a running Hermes after an apply changes it. `~/.hermes/.env` is a `KEY=value` file; its template replaces or appends the declared lines and keeps the rest.
 
 ### `private_` prefix and directory permissions
 
@@ -87,7 +90,7 @@ chezmoi-with-op diff
 chezmoi-with-op cat ~/.gitconfig
 ```
 
-Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env` or `~/.claude/settings.json` in logged sessions; their output contains a token.
+Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env`, `~/.claude/settings.json`, or `~/.hermes/.env` in logged sessions; their output contains a token.
 
 `chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.config/op/env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
 

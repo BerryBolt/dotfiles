@@ -28,6 +28,7 @@ CLIs with their own OAuth sign-in keep that session as runtime state, not config
 | `gh` | `gh auth login --web` | `~/.config/gh/` |
 | `wrangler` | `wrangler login` | `~/.config/.wrangler/` |
 | `codex` | `codex login --device-auth`; the owner approves the code with the ChatGPT subscription | `~/.codex/auth.json` |
+| `hermes` | `hermes setup model`: choose OpenAI Codex, decline importing the Codex CLI credentials, and the owner approves the device code | `~/.hermes/auth.json` |
 
 The agent MUST NOT print or read these session files or tokens into its own context.
 
@@ -50,6 +51,15 @@ The token is limited to inference and cannot read the account profile, so Claude
 
 - MUST NOT export the token into a shell or a service environment; the settings file is its one location.
 - MUST NOT use it as an API key or with `claude --bare`, which ignores it. A subscription token works only in the unmodified `claude` CLI.
+
+### Hermes
+
+Hermes reaches Codex through its own device login in `~/.hermes/auth.json`, not the Codex CLI's `~/.codex/auth.json`. Each login's refresh token rotates, so two programs sharing one would log each other out.
+
+- MUST NOT import the Codex CLI credentials into Hermes. The setup wizard offers it; answer no. The declared config also sets `auth.adopt_external_logins: false`, so Hermes never borrows the CLI's login on its own when its session needs repair.
+- The Codex rules above apply to Hermes' login as well: never copy `auth.json`, and report a revoked login to the owner instead of signing in again.
+
+Apply writes Hermes' Telegram settings into `~/.hermes/.env` (mode 0600), which Hermes reads whoever starts it: the bot token from the `Telegram Bot - API key` item's `credential` field, and the owner's Telegram user ID from its `owner user ID` field, as both the only allowed user and the home chat for deliveries. Hermes and its setup wizard write other lines to the file; apply keeps them.
 
 ## Environment setup
 

@@ -1,0 +1,31 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  ~/.hermes/.env holds Hermes' secrets and platform settings. Hermes and its
+  installer write it too, so this template sets the declared variables from
+  1Password and keeps every other line. It holds tokens, so it is 0600.
+  See policies/credentials.md "Hermes".
+*/ -}}
+{{- if not .chezmoi.stdin -}}
+{{-   fail "~/.hermes/.env is missing; Hermes' installer (apply script 50) seeds it" -}}
+{{- end -}}
+{{- $env := .chezmoi.stdin -}}
+{{- $telegram := printf "op://%s/Telegram Bot - API key" .op_vault -}}
+{{- $owner := onepasswordRead (printf "%s/owner user ID" $telegram) -}}
+{{- $declared := dict -}}
+{{- /* The bot, and the owner as its only user and the home chat for deliveries. */ -}}
+{{- $declared = set $declared "TELEGRAM_BOT_TOKEN" (onepasswordRead (printf "%s/credential" $telegram)) -}}
+{{- $declared = set $declared "TELEGRAM_ALLOWED_USERS" $owner -}}
+{{- $declared = set $declared "TELEGRAM_HOME_CHANNEL" $owner -}}
+{{- range $name, $value := $declared -}}
+{{-   $line := printf "%s=%s" $name $value -}}
+{{-   $pattern := printf "(?m)^%s=.*$" $name -}}
+{{-   if regexMatch $pattern $env -}}
+{{-     $env = regexReplaceAllLiteral $pattern $env $line -}}
+{{-   else -}}
+{{-     if not (hasSuffix "\n" $env) -}}
+{{-       $env = printf "%s\n" $env -}}
+{{-     end -}}
+{{-     $env = printf "%s%s\n" $env $line -}}
+{{-   end -}}
+{{- end -}}
+{{- $env -}}
