@@ -22,7 +22,7 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
-Installing needs no model sign-in or agent runtime; Claude Code works from the token item. The agent signs in to Codex, and Hermes to Codex with its own login, afterwards (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
+Claude Code works from the token item. Codex needs two device logins that 1Password cannot hold, one for the CLI and one for Hermes: an attended install signs in whichever is missing and the owner approves each code with the ChatGPT subscription; an unattended install names the missing ones (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).
 
 ## Install
 
@@ -76,10 +76,10 @@ git -C ~/brain pull          # the workspace checkout, cloned by the installer
 git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
-codex login --device-auth    # once: the owner approves the code with the ChatGPT subscription
+codex login --device-auth    # when not signed in (an attended install runs it); the owner approves the code
 codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
 claude -p "..."              # Opus 5.5 on the subscription token
-hermes setup model           # once: Hermes' own Codex sign-in (decline importing the CLI's); the owner approves the code
+hermes auth add openai-codex --type oauth  # when not signed in (an attended install runs it): Hermes' own Codex login
 hermes -z "..."               # GPT-6 Luna through Hermes' own sign-in, at the release pinned in apply script 50
 ```
 

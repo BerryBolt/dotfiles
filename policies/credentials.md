@@ -21,14 +21,14 @@ The agent works like an employee with its own accounts: it signs up for services
 
 ### Runtime sign-ins
 
-CLIs with their own OAuth sign-in keep that session as runtime state, not configuration. The repo installs them; the agent signs in itself and signs in again after a restore:
+CLIs with their own OAuth sign-in keep that session as runtime state, not configuration. The repo installs them; the agent signs in itself and signs in again after a restore. The Codex logins are the exception: an attended install runs both when they are missing, and the owner approves each code:
 
 | CLI | Sign-in | Session stored in |
 | --- | --- | --- |
 | `gh` | `gh auth login --web` | `~/.config/gh/` |
 | `wrangler` | `wrangler login` | `~/.config/.wrangler/` |
 | `codex` | `codex login --device-auth`; the owner approves the code with the ChatGPT subscription | `~/.codex/auth.json` |
-| `hermes` | `hermes setup model`: choose OpenAI Codex, decline importing the Codex CLI credentials, and the owner approves the device code | `~/.hermes/auth.json` |
+| `hermes` | `hermes auth add openai-codex --type oauth`, which never offers to import the Codex CLI credentials; the owner approves the device code | `~/.hermes/auth.json` |
 
 The agent MUST NOT print or read these session files or tokens into its own context.
 

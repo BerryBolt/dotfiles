@@ -573,6 +573,43 @@ apply_workspace_links() {
   fi
 }
 
+# Sign in to Codex twice, for the CLI and for Hermes, whose own login keeps the
+# two from rotating each other's refresh token. These logins are the part of
+# the setup 1Password cannot hold (policies/credentials.md "Runtime sign-ins").
+# Each is a device login the owner approves, so it runs only when a person is
+# at the terminal, and only when that login is missing, so a repeat install
+# never replaces a working one. Hermes' `auth add` never offers to import the
+# CLI's login, and its gateway reads the login on each turn, so it answers
+# without a restart. Neither sees the service-account token or an API key,
+# which Codex would take as its login.
+sign_in_codex() {
+  (
+    unset OP_SERVICE_ACCOUNT_TOKEN CODEX_API_KEY OPENAI_API_KEY
+    codex="$HOME/.local/bin/codex"
+    hermes="$HOME/.local/bin/hermes"
+
+    if ! "$codex" login status 2>&1 | grep -qx "Logged in using ChatGPT"; then
+      if [ -n "$NONINTERACTIVE" ] || ! has_tty; then
+        log_info "Unattended run: the Codex CLI is not signed in. Run codex login --device-auth in a terminal."
+      else
+        log_info "Signing in the Codex CLI. Approve the code with the ChatGPT subscription..."
+        "$codex" login --device-auth < "$TTY_DEV" ||
+          log_error "Codex CLI sign-in failed. Re-run the installer to try again."
+      fi
+    fi
+
+    if ! "$hermes" auth status openai-codex 2>&1 | grep -qx "openai-codex: logged in"; then
+      if [ -n "$NONINTERACTIVE" ] || ! has_tty; then
+        log_info "Unattended run: Hermes is not signed in to Codex. Run hermes auth add openai-codex --type oauth in a terminal."
+      else
+        log_info "Signing in Hermes to Codex with its own login. Approve the code with the ChatGPT subscription..."
+        "$hermes" auth add openai-codex --type oauth < "$TTY_DEV" ||
+          log_error "Hermes sign-in failed. Re-run the installer to try again."
+      fi
+    fi
+  )
+}
+
 # Finish with Omarchy's own update, the one its first-run notification offers.
 # It asks before starting and may ask to remove orphans or reboot, even with
 # -y, so it runs only when a person is at the terminal, and reads the answers
@@ -628,6 +665,7 @@ bootstrap_main() {
 
   clone_workspace
   apply_workspace_links
+  sign_in_codex
   update_omarchy
 
   echo ""
