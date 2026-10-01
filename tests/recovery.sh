@@ -122,6 +122,17 @@ check "op works again through with-op" \
 
 echo "Final state"
 check "reapply succeeds without a supplied token" reapply
+retry_installer() {
+  local sha
+  sha=$(git -C "$HOME/.local/share/chezmoi" rev-parse HEAD)
+  curl -fsSL "https://raw.githubusercontent.com/BerryBolt/dotfiles/$sha/install.sh" |
+    env -u CHEZMOI_AGENT_NAME -u CHEZMOI_AGENT_EMAIL -u CHEZMOI_AGENT_HANDLE_GITHUB \
+      -u CHEZMOI_AGENT_WORKSPACE_REPO -u CHEZMOI_OP_VAULT -u CHEZMOI_OP_SSH_ITEM \
+      -u CHEZMOI_OP_ACCOUNT_ITEM -u OP_SERVICE_ACCOUNT_TOKEN \
+      bash -s -- --non-interactive --revision "$sha"
+}
+check "installer retry recovers every input without environment overrides" retry_installer
+check "installer retry leaves the caller without the token" test -z "${OP_SERVICE_ACCOUNT_TOKEN:-}"
 check "no managed-file drift" chezmoi-with-op verify --exclude=scripts
 check "no leftover key temp files" bash -c '! compgen -G "$HOME/.ssh/*.tmp*" >/dev/null'
 

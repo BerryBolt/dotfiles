@@ -37,13 +37,15 @@ Env overrides:
   OP_SERVICE_ACCOUNT_TOKEN=...
 
 Optional:
-  CHEZMOI_NONINTERACTIVE=1  # disable prompts (requires all env vars)
+  CHEZMOI_NONINTERACTIVE=1  # disable prompts (requires all inputs)
   --non-interactive         # same as above
   --revision <sha>          # apply this full 40-character commit SHA of the
   DOTFILES_REVISION=<sha>   # source instead of the default branch; use the
                             # same SHA as the installer URL when testing
 
 The source repository is https://github.com/<GitHub handle>/dotfiles.git.
+On reruns, unset inputs are recovered from chezmoi config, ~/.config/op/env,
+and ~/brain's origin. Environment overrides take precedence.
 EOF
 }
 
@@ -344,6 +346,47 @@ missing_inputs() {
   printf '%s' "$missing"
 }
 
+# Read the config as TOML with chezmoi's own parser, without loading source
+# templates (which may need credentials). Never evaluate saved data as shell.
+load_saved_inputs() {
+  local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/chezmoi/chezmoi.toml"
+  local binding input key saved origin
+  if [ -f "$config_file" ]; then
+    for binding in AGENT_NAME:agent_name AGENT_EMAIL:agent_email \
+      AGENT_HANDLE_GITHUB:agent_handle_github OP_VAULT:op_vault \
+      OP_SSH_ITEM:op_ssh_item OP_ACCOUNT_ITEM:op_account_item; do
+      input=${binding%%:*}
+      key=${binding#*:}
+      if is_blank "${!input}"; then
+        saved=$(DOTFILES_SAVED_CONFIG="$config_file" DOTFILES_SAVED_KEY="$key" \
+          with_bootstrap_tools chezmoi execute-template --init \
+          '{{ $data := (include (env "DOTFILES_SAVED_CONFIG") | fromToml).data | default dict }}{{ $value := get $data (env "DOTFILES_SAVED_KEY") | default "" }}{{ if not (kindIs "string" $value) }}{{ fail "Saved installer inputs must be strings" }}{{ end }}{{ $value }}') ||
+          log_error "Cannot read saved installer inputs from $config_file. Repair the config and re-run."
+        printf -v "$input" '%s' "$saved"
+      fi
+    done
+  fi
+
+  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && [ -f "$HOME/.config/op/env" ]; then
+    # The file's other variables stay in this child, so they cannot overwrite
+    # a vault override. The token never reaches the caller's shell.
+    OP_SERVICE_ACCOUNT_TOKEN=$(
+      . "$HOME/.config/op/env" || exit 1
+      printf '%s' "${OP_SERVICE_ACCOUNT_TOKEN:-}"
+    ) || log_error "Cannot load ~/.config/op/env. Repair it or supply OP_SERVICE_ACCOUNT_TOKEN."
+  fi
+
+  if is_blank "$WORKSPACE_REPO" && [ -d "$WORKSPACE_DIR/.git" ]; then
+    origin=$(git -C "$WORKSPACE_DIR" remote get-url origin) ||
+      log_error "Cannot read the workspace origin. Set CHEZMOI_AGENT_WORKSPACE_REPO."
+    case "$origin" in
+      git@github.com:*) WORKSPACE_REPO=${origin#git@github.com:} ;;
+      *) log_error "The workspace origin must use git@github.com:owner/name.git. Set CHEZMOI_AGENT_WORKSPACE_REPO." ;;
+    esac
+    WORKSPACE_REPO=${WORKSPACE_REPO%.git}
+  fi
+}
+
 collect_inputs() {
   AGENT_NAME="${CHEZMOI_AGENT_NAME:-}"
   AGENT_EMAIL="${CHEZMOI_AGENT_EMAIL:-}"
@@ -352,6 +395,8 @@ collect_inputs() {
   OP_VAULT="${CHEZMOI_OP_VAULT:-}"
   OP_SSH_ITEM="${CHEZMOI_OP_SSH_ITEM:-}"
   OP_ACCOUNT_ITEM="${CHEZMOI_OP_ACCOUNT_ITEM:-}"
+  OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
+  load_saved_inputs
   OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "${OP_SERVICE_ACCOUNT_TOKEN:-}")
   case "$OP_SERVICE_ACCOUNT_TOKEN" in
     ops_*|"") ;;
@@ -368,7 +413,7 @@ collect_inputs() {
   if [ -n "$NONINTERACTIVE" ]; then
     missing=$(missing_inputs)
     if [ -n "$missing" ]; then
-      log_error "Non-interactive mode requires env vars:$missing"
+      log_error "Non-interactive mode requires inputs missing from saved setup. Set env vars:$missing"
     fi
   elif ! has_tty; then
     missing=$(missing_inputs)
@@ -378,7 +423,7 @@ Set env vars:$missing
 Tip: curl -fsSL $SCRIPT_URL | bash"
     fi
   else
-    log_info "Answer a few prompts. You can review and edit before apply."
+    log_info "Using environment overrides and saved inputs. Supply any missing values, then review before apply."
     if is_blank "$AGENT_NAME"; then
       prompt_string "Agent name" "Berry Bolt" "$AGENT_NAME"
       AGENT_NAME=$PROMPT_VALUE

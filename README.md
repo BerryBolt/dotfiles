@@ -30,7 +30,9 @@ Claude Code works from the token item. Codex needs two device logins that 1Passw
 curl -fsSL https://berrybolt.bot/install.sh | bash
 ```
 
-The installer prompts for the account name, email, GitHub handle, workspace repository, vault, SSH key item, workstation account item, and token, then shows a review step. For an unattended run, set every input in the environment and pass `--non-interactive`. Keep the token inside a subshell, off the command line and out of shell history:
+The installer prompts for missing inputs, then shows a review step. On a rerun, it reuses identity, vault, and item selectors from chezmoi configuration, the token from `~/.config/op/env`, and the workspace repository from `~/brain`'s GitHub SSH origin. Environment overrides take precedence. If a device login expires, rerun the same install command and approve the new code; earlier setup stays applied.
+
+For an unattended fresh install, set every input in the environment and pass `--non-interactive`. An unattended rerun can reuse saved inputs; it fails if any are missing. Keep the token inside a subshell, off the command line and out of shell history:
 
 ```bash
 (
