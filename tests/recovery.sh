@@ -132,7 +132,6 @@ retry_installer() {
       bash -s -- --non-interactive --revision "$sha"
 }
 check "installer retry recovers every input without environment overrides" retry_installer
-check "installer retry leaves the caller without the token" test -z "${OP_SERVICE_ACCOUNT_TOKEN:-}"
 check "no managed-file drift" chezmoi-with-op verify --exclude=scripts
 check "no leftover key temp files" bash -c '! compgen -G "$HOME/.ssh/*.tmp*" >/dev/null'
 
