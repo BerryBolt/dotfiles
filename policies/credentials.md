@@ -45,7 +45,7 @@ Every Codex process on the workstation shares the one login in `~/.codex/auth.js
 
 Claude Code runs on the owner's subscription through a one-year token, not a runtime sign-in. The owner creates it with `claude setup-token` and stores it as the `Claude Code - OAuth token` item (`API Credential`; `credential` holds the token, `expires` its expiry date), and replaces it before it expires; a reapply then writes the new token.
 
-Apply writes the token as `CLAUDE_CODE_OAUTH_TOKEN` into the `env` block of `~/.claude/settings.json` (mode 0600), so `claude` finds it whoever starts it: a terminal, a script, a service, or a Codex worker, whose commands never inherit token variables. Interactive `claude` would still start first-run onboarding, which asks for a login method even with the token set, so apply also marks onboarding complete in `~/.claude.json`. Anthropic documents the token as an environment variable and the `env` block as a way to set one; keeping the token there is this repo's choice. Claude Code passes `env` entries to the commands it runs, so those commands can read the token, as they can read `~/.config/op/env`.
+Apply writes the token as `CLAUDE_CODE_OAUTH_TOKEN` into the `env` block of `~/.claude/settings.json` (mode 0600), so `claude` finds it whoever starts it: a terminal, a script, a service, or a Codex worker, whose commands never inherit token variables. Interactive `claude` would still start first-run onboarding, which asks for a login method even with the token set, so apply also marks onboarding complete in `~/.claude.json`. Anthropic documents the token as an environment variable and the `env` block as a way to set one; keeping the token there is this repo's choice. Claude Code passes `env` entries to the commands it runs, so those commands can read the token, as they can read `~/.hermes/.op.env`.
 
 The token is limited to inference and cannot read the account profile, so Claude Code does not know the subscription plan. It labels the plan "Claude API", `/usage` shows only the session's own totals, and the plan-based default model does not apply, so the settings pin Opus 5.5 (`claude-opus-5-5`). Usage-limit warnings still appear, and `/model` still lists the models the subscription offers.
 
@@ -65,10 +65,10 @@ Apply writes Hermes' Telegram settings into `~/.hermes/.env` (mode 0600), which 
 
 Required environment variables for `op`:
 - `OP_SERVICE_ACCOUNT_TOKEN` — service account token (MUST NOT log or print)
-- `OP_VAULT` — default vault name
+- `OP_VAULT` — configured vault name; the direct `with-op item list/get` mode passes it as `--vault` (the raw CLI does not use this variable as a default)
 - `OP_FORMAT` — default CLI output format; use `json` in this environment
 
-Single source of truth: **`~/.config/op/env`** holds all three. It is chezmoi-managed at mode 0600 and is NEVER sourced into a parent shell. The wrappers load it into a one-shot child process for the duration of a single command:
+Single source of truth: **`~/.hermes/.op.env`** holds all three. It is chezmoi-managed at mode 0600 and is NEVER sourced into the parent interactive shell. Hermes loads this supported file itself for unattended browser-vault authentication. The wrappers load the same file into their child processes for individual CLI commands:
 
 | Wrapper | Where | Available in |
 | --- | --- | --- |
@@ -78,17 +78,17 @@ Single source of truth: **`~/.config/op/env`** holds all three. It is chezmoi-ma
 
 | Variable                   | Sensitive? | Visible in interactive shell? | How commands see it                       |
 | -------------------------- | ---------- | ----------------------------- | ----------------------------------------- |
-| `OP_SERVICE_ACCOUNT_TOKEN` | Yes        | No                            | Wrapper subshell only                     |
-| `OP_VAULT`                 | No         | No                            | Wrapper subshell only                     |
-| `OP_FORMAT`                | No         | No                            | Wrapper subshell only                     |
+| `OP_SERVICE_ACCOUNT_TOKEN` | Yes        | No                            | Hermes runtime or wrapper child process   |
+| `OP_VAULT`                 | No         | No                            | Hermes runtime or wrapper child process   |
+| `OP_FORMAT`                | No         | No                            | Hermes runtime or wrapper child process   |
 
-None of the three are exported into the parent shell. This prevents the token from leaking to subprocesses (package installs, git hooks, IDE extensions, build scripts) and keeps all OP config centralized in one file.
+None of the three are exported by interactive shell startup. Native Hermes integration is an explicit exception to subprocess-only credential isolation: Hermes loads the token into its own process, and its current subprocess sanitizer does not strip `OP_SERVICE_ACCOUNT_TOKEN`. Commands launched by Hermes can therefore inherit it. Do not claim wrapper-only isolation for those commands; all commands running as the account can also read the mode-0600 file.
 
 **Practical consequence:** `$OP_VAULT` does NOT expand in your interactive shell. See "Calling `op`" below for the two idioms that replace inline `$OP_VAULT` expansion.
 
 ### Calling `op`
 
-In an interactive Bash terminal, `op` is a shell function that runs `with-op op`, loading `~/.config/op/env` for the duration of the call. Just run `op` normally:
+In an interactive Bash terminal, `op` is a shell function that runs `with-op op`, loading `~/.hermes/.op.env` for the duration of the call. Just run `op` normally:
 
 ```bash
 op whoami
@@ -97,7 +97,7 @@ op item list
 op item get "<Title>"
 ```
 
-The token (and the other OP_* vars) only exist in the process that runs the binary. The parent shell and its other children never see them. Scripts and other non-interactive callers do not get the function; they call `with-op op ...` instead.
+The wrapper loads the OP_* vars into its command, not back into the invoking shell. This does not remove credentials already inherited by a caller, including commands started by Hermes. Scripts and other non-interactive callers do not get the function; they call `with-op op ...` instead.
 
 ### When you need `$OP_VAULT` inline
 
@@ -120,14 +120,14 @@ with-op terraform apply
 
 ### Manual loading (avoid)
 
-You SHOULD NOT do `set -a; source ~/.config/op/env; set +a` in interactive shells. It pollutes the shell env with the token, which then leaks to every subprocess started from that shell. Use `op`, `with-op`, or `chezmoi-with-op` instead.
+You SHOULD NOT do `set -a; source ~/.hermes/.op.env; set +a` in interactive shells. It pollutes the shell env with the token, which then leaks to every subprocess started from that shell. Use `op`, `with-op`, or `chezmoi-with-op` instead.
 
 Manual sourcing is acceptable inside scripts that exit when they finish, where the env dies with the script.
 
 ## Operational assumptions
 
 - Access SHOULD be available non-interactively through the 1Password CLI.
-- The default env file for `op` and `chezmoi-with-op` is `~/.config/op/env`.
+- The default env file for `op` and `chezmoi-with-op` is `~/.hermes/.op.env`.
 - The managed runtime env SHOULD set `OP_FORMAT=json` so agent-driven `op` commands default to machine-readable output.
 - If you do not have access to 1Password, you MUST stop and ask for access rather than inventing an alternate secret store.
 
@@ -140,7 +140,7 @@ op whoami --format json
 op vault list --format json
 ```
 
-The `op` shell wrapper loads `~/.config/op/env` for each call automatically (see Environment setup).
+The `op` shell wrapper loads `~/.hermes/.op.env` for each call automatically (see Environment setup).
 
 ### CLI interaction guardrails
 
@@ -214,7 +214,7 @@ Rules:
 
 ## Workflows (strict order)
 
-All command snippets below use the `op` shell wrapper, which loads `~/.config/op/env` into a subshell on each call. Because `OP_VAULT` and `OP_FORMAT` are set inside that subshell, you do NOT pass `--vault` or `--format` explicitly — `op` picks them up from the subshell env. See Environment setup.
+All command snippets below use the `op` shell wrapper, which loads `~/.hermes/.op.env` for each call. `OP_FORMAT` sets the output format. For item operations, explicitly pass `--vault "<vault>"`; `OP_VAULT` alone is not a raw CLI default. For `list` and `get`, you may instead use `with-op item ...`, which supplies the configured vault. The snippets below show operation structure; add the explicit vault to raw `op item` calls. See Environment setup.
 
 ### Before ANY create operation
 
@@ -380,7 +380,7 @@ with-op bash -c 'op read "op://$OP_VAULT/GitHub/password"'
 
 ### Create
 
-The wrapper's subshell has `OP_VAULT` set, so `op` targets it by default — no `--vault` flag needed.
+Pass `--vault "<vault>"` to item creation commands. The wrapper loads `OP_VAULT`, but the raw CLI does not interpret it as a default vault.
 
 ```bash
 # Login

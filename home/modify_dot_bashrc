@@ -11,7 +11,7 @@ end='# <<< dotfiles <<<'
 block=$(cat <<'BLOCK'
 # >>> dotfiles >>>
 # Managed by the dotfiles chezmoi source; edit it there, not here.
-# `op` loads ~/.config/op/env into a subshell per call (see with-op).
+# `op` loads ~/.hermes/.op.env into a subshell per call (see with-op).
 op() { with-op op "$@"; }
 # <<< dotfiles <<<
 BLOCK

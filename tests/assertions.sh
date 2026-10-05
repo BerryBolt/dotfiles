@@ -82,8 +82,31 @@ check "with-op works for non-interactive callers" \
   env -i HOME="$HOME" PATH=/usr/bin:/bin "$HOME/.local/bin/with-op" bash -c 'op vault get "$OP_VAULT" >/dev/null'
 
 echo "Credentials"
-check "~/.config/op is 700" mode_is "$HOME/.config/op" 700
-check "~/.config/op/env is 600" mode_is "$HOME/.config/op/env" 600
+check "~/.hermes is 700" mode_is "$HOME/.hermes" 700
+check "~/.hermes/.op.env is 600" mode_is "$HOME/.hermes/.op.env" 600
+check "the old credential file is absent" test ! -e "$HOME/.config/op/env"
+hermes_vault_access() {
+  (cd "$HOME/.hermes/hermes-agent" && env -u OP_SERVICE_ACCOUNT_TOKEN -u OP_VAULT -u OP_FORMAT \
+    venv/bin/python -c 'from hermes_cli.env_loader import load_hermes_dotenv
+load_hermes_dotenv()
+from agent.vault_backends.onepassword import OnePasswordLoginBackend
+from pathlib import Path
+import json
+import yaml
+config = yaml.safe_load((Path.home() / ".hermes/config.yaml").read_text())
+settings = config["vault"]["onepassword"]
+assert settings["enabled"] is True
+assert settings["binary_path"] == str(Path.home() / ".local/bin/with-op")
+backend = OnePasswordLoginBackend(settings)
+assert backend.is_unlocked(), "Hermes did not load its service-account credential"
+backend.list_items()
+# Read the workstation item without printing its contents; this exercises
+# the explicit vault required by service-account item retrieval.
+import subprocess
+item = subprocess.check_output(["chezmoi", "execute-template", "{{ .op_account_item }}"], text=True).strip()
+assert json.loads(backend._run("item", "get", item, "--format", "json"))["id"]' 2>/dev/null)
+}
+check "Hermes loads service-account auth through its supported env file" hermes_vault_access
 check "chezmoi config does not persist the token" \
   bash -c '! grep -q "ops_" "$1"' _ "$HOME/.config/chezmoi/chezmoi.toml"
 

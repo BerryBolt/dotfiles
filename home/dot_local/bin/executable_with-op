@@ -3,6 +3,7 @@
 # exporting it to the calling shell.
 #
 #   with-op op whoami
+#   with-op item get <item>  # Hermes' direct, vault-scoped item calls
 #   with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
 
 set -eu
@@ -11,7 +12,7 @@ set -eu
 # IDE task runners, cron) can still resolve op and other mise tools.
 export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 
-ENV_FILE="$HOME/.config/op/env"
+ENV_FILE="$HOME/.hermes/.op.env"
 
 if [ "$#" -eq 0 ]; then
     echo "usage: with-op <command> [args...]" >&2
@@ -20,7 +21,7 @@ fi
 
 if [ ! -f "$ENV_FILE" ]; then
     echo "error: $ENV_FILE not found. Restore it by supplying the token to chezmoi-with-op:" >&2
-    echo "         read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=\$t chezmoi-with-op apply --force ~/.config/op/env; unset t" >&2
+    echo "         read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=\$t chezmoi-with-op apply --force ~/.hermes/.op.env; unset t" >&2
     exit 1
 fi
 
@@ -28,5 +29,24 @@ set -a
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 set +a
+
+# Hermes invokes its configured op binary with item subcommands, without
+# the leading `op`. Reserve that form for the read operations it uses.
+if [ "$1" = item ]; then
+    case "${2:-}" in
+        list|get) ;;
+        *) echo "error: direct item mode supports only list and get." >&2; exit 2 ;;
+    esac
+    : "${OP_VAULT:?the credential env file must set OP_VAULT}"
+    # Hermes explicitly requests JSON for lists; passwords and OTP need text.
+    unset OP_FORMAT
+    # Preserve an explicit vault supplied by the caller.
+    for arg in "$@"; do
+        case "$arg" in
+            --vault|--vault=*) exec op "$@" ;;
+        esac
+    done
+    exec op "$@" --vault "$OP_VAULT"
+fi
 
 exec "$@"

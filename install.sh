@@ -44,7 +44,7 @@ Optional:
                             # same SHA as the installer URL when testing
 
 The source repository is https://github.com/<GitHub handle>/dotfiles.git.
-On reruns, unset inputs are recovered from chezmoi config, ~/.config/op/env,
+On reruns, unset inputs are recovered from chezmoi config, ~/.hermes/.op.env,
 and ~/brain's origin. Environment overrides take precedence.
 EOF
 }
@@ -367,13 +367,13 @@ load_saved_inputs() {
     done
   fi
 
-  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && [ -f "$HOME/.config/op/env" ]; then
+  if is_blank "$OP_SERVICE_ACCOUNT_TOKEN" && [ -f "$HOME/.hermes/.op.env" ]; then
     # The file's other variables stay in this child, so they cannot overwrite
     # a vault override. The token never reaches the caller's shell.
     OP_SERVICE_ACCOUNT_TOKEN=$(
-      . "$HOME/.config/op/env" || exit 1
+      . "$HOME/.hermes/.op.env" || exit 1
       printf '%s' "${OP_SERVICE_ACCOUNT_TOKEN:-}"
-    ) || log_error "Cannot load ~/.config/op/env. Repair it or supply OP_SERVICE_ACCOUNT_TOKEN."
+    ) || log_error "Cannot load ~/.hermes/.op.env. Repair it or supply OP_SERVICE_ACCOUNT_TOKEN."
   fi
 
   if is_blank "$WORKSPACE_REPO" && [ -d "$WORKSPACE_DIR/.git" ]; then
