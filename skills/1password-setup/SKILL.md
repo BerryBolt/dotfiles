@@ -28,11 +28,11 @@ This step requires human action in the 1Password web console:
 
 ### 2. Store Token
 
-Provide the token to `install.sh` when prompted (see repo [README.md](../../README.md)). `install.sh` exports it into chezmoi's process env, and chezmoi renders it into `~/.config/op/env` (mode 0600). That file is the single source of truth for all OP_* env vars at rest. The token is NOT persisted in chezmoi data.
+Provide the token to `install.sh` when prompted (see repo [README.md](../../README.md)). `install.sh` exports it into chezmoi's process env, and chezmoi renders it into `~/.hermes/.op.env` (mode 0600). That file is the single source of truth for all OP_* env vars at rest. The token is NOT persisted in chezmoi data.
 
 ### 3. Validate Access
 
-After bootstrap, open a new Omarchy terminal. The `op` shell function loads `~/.config/op/env` into the command's process on each call, so you just run `op` directly (from scripts, use `with-op op ...`):
+After bootstrap, open a new Omarchy terminal. The `op` shell function loads `~/.hermes/.op.env` into the command's process on each call, so you just run `op` directly (from scripts, use `with-op op ...`):
 
 ```bash
 op whoami
@@ -65,7 +65,7 @@ If token is compromised:
 1. Go to 1Password web console → Service Accounts
 2. Revoke old token
 3. Create new token
-4. Re-render `~/.config/op/env` with the new token: `read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply; unset t` (see [runbooks/1password-service-account.md](../../runbooks/1password-service-account.md#rotate-the-token))
+4. Re-render `~/.hermes/.op.env` with the new token: `read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply; unset t` (see [runbooks/1password-service-account.md](../../runbooks/1password-service-account.md#rotate-the-token))
 5. `op whoami` to verify
 
 ## References

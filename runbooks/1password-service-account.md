@@ -2,7 +2,7 @@
 
 ## Goal
 
-Use 1Password CLI non-interactively through a service account, with the token scoped to single commands.
+Use 1Password non-interactively through a service account, with its environment in Hermes' supported `.op.env` file and reused by CLI credential wrappers.
 
 ## Prerequisites
 
@@ -11,7 +11,7 @@ Use 1Password CLI non-interactively through a service account, with the token sc
 
 ## How the env file is managed
 
-`~/.config/op/env` is the single source of truth for all OP_* env vars at rest. It is rendered by chezmoi from [home/dot_config/private_op/private_env.tmpl](../home/dot_config/private_op/private_env.tmpl) at mode 0600:
+`~/.hermes/.op.env` is the single source of truth for all OP_* env vars at rest. It is rendered by chezmoi from [home/private_dot_hermes/private_dot_op.env.tmpl](../home/private_dot_hermes/private_dot_op.env.tmpl) at mode 0600:
 
 | Variable                   | Source at render time                                           |
 | -------------------------- | --------------------------------------------------------------- |
@@ -21,12 +21,24 @@ Use 1Password CLI non-interactively through a service account, with the token sc
 
 The token is NOT persisted in chezmoi data. It reaches the template only through the process env of whichever chezmoi invocation is rendering. On first bootstrap `install.sh` exports it; on subsequent applies `chezmoi-with-op` sources this same file before invoking chezmoi and re-supplies the token that way. A token the caller supplies to `chezmoi-with-op` for one command takes precedence over the file; that is how the file is restored or rotated (below). A bare `chezmoi apply` without `chezmoi-with-op` will fail fast via a template guard rather than silently clobber the file with an empty token.
 
-You MUST NOT hand-edit `~/.config/op/env`. It is a chezmoi-managed target and any edit will be overwritten on the next `chezmoi apply`. To change the vault, use the data-rotation workflow in `policies/chezmoi.md`. To rotate the token, see "Rotate the token" below.
+You MUST NOT hand-edit `~/.hermes/.op.env`. It is a chezmoi-managed target and any edit will be overwritten on the next `chezmoi apply`. To change the vault, use the data-rotation workflow in `policies/chezmoi.md`. To rotate the token, see "Rotate the token" below.
 
-The file is NEVER sourced into a parent shell — only into one-shot child processes started by the wrappers. The file's consumers are:
+The file is NEVER sourced into the parent interactive shell. Hermes loads `.op.env` through its native dotenv loader, so the browser credential tools can authenticate with the same service account without an interactive unlock. The file's consumers are:
 - `with-op` at `~/.local/bin/with-op`, and the interactive `op` function in the dotfiles block of `~/.bashrc` that calls it
 - `chezmoi-with-op` at `~/.local/bin/chezmoi-with-op`
-- `run_after_30-restore-ssh-key.sh` (fallback load when chezmoi runs without the token in its env)
+- Hermes' native dotenv loader and browser-vault tools
+- `install.sh` when recovering saved inputs
+- `run_after_20-passwordless-sudo.sh` and `run_after_30-restore-ssh-key.sh` (fallback load when chezmoi runs without the token in its env)
+
+Hermes keeps the token in its runtime process, and its current child-process sanitizer does not strip it. Commands started by Hermes can inherit the token; wrapper-only isolation applies to ordinary shell callers, not to Hermes' runtime. See the explicit exception in [the credential policy](../policies/credentials.md#environment-setup).
+
+## Hermes browser credentials
+
+The managed `vault.onepassword.binary_path` points to `~/.local/bin/with-op`. Hermes calls it as `with-op item list ...` or `with-op item get ...`; the wrapper adds `--vault "$OP_VAULT"` unless the caller supplied a vault explicitly. This direct mode supports only `list` and `get` and unsets the inherited `OP_FORMAT=json`: Hermes explicitly requests JSON for lists, but password and `--otp` retrieval need text output. Existing generic forms such as `with-op op whoami` and `with-op bash ...` keep their behavior. No additional adapter or Hermes source patch is required.
+
+Hermes resolves passwords by the field label `password`. A Login item with a differently labeled password field needs that existing field renamed, preserving its value and OTP fields. This is a vault-data correction, not a dotfiles secret or a password rotation.
+
+To migrate an existing installation, invoke the new source's apply with the already-installed `chezmoi-with-op`: the old wrapper supplies the token from the former file for that process. Apply writes `.hermes/.op.env`, updates its consumers, and removes `.config/op/env` via `.chezmoiremove`. No compatibility symlink or second credential file is retained. If using the new installer instead, supply the token explicitly on the first migration run, because it reads only the new saved-token path.
 
 ## Verify service-account access
 
@@ -36,7 +48,7 @@ op vault list
 op vault list --permission write_items
 ```
 
-In an interactive Bash terminal, the `op` function loads `~/.config/op/env` automatically per call; from scripts, use `with-op op ...`. `OP_FORMAT=json` is set inside the wrapper process, so you do not need `--format json` explicitly. See `policies/credentials.md` for the wrapper architecture.
+In an interactive Bash terminal, the `op` function loads `~/.hermes/.op.env` automatically per call; from scripts, use `with-op op ...`. `OP_FORMAT=json` is set inside the wrapper process, so you do not need `--format json` explicitly. See `policies/credentials.md` for the wrapper architecture.
 
 Expected:
 - `op whoami` returns `user_type: SERVICE_ACCOUNT`.
@@ -46,7 +58,7 @@ Expected:
 
 ## Rotate the token
 
-The token is not stored in chezmoi data. Supply the new token to `chezmoi-with-op` for one apply; it takes precedence over the old value in the file and re-renders `~/.config/op/env`.
+The token is not stored in chezmoi data. Supply the new token to `chezmoi-with-op` for one apply; it takes precedence over the old value in the file and re-renders `~/.hermes/.op.env`.
 
 1. Generate a new token in the 1Password web console → Settings → Automation → Service Accounts.
 2. In a terminal, without putting the token in history or the parent environment:
@@ -58,10 +70,10 @@ The token is not stored in chezmoi data. Supply the new token to `chezmoi-with-o
 
 ## Restore a missing env file
 
-If `~/.config/op/env` was deleted, `op`, `with-op`, and `chezmoi-with-op` fail with the restore command. Supply the token for one command and restore only that file:
+If `~/.hermes/.op.env` was deleted, `op`, `with-op`, and `chezmoi-with-op` fail with the restore command. Supply the token for one command and restore only that file:
 
 ```bash
-read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply --force ~/.config/op/env; unset t
+read -rsp 'Token: ' t && OP_SERVICE_ACCOUNT_TOKEN=$t chezmoi-with-op apply --force ~/.hermes/.op.env; unset t
 ```
 
 `--force` is required because chezmoi treats a deleted managed file as a local change and would otherwise ask before recreating it. Naming the target limits it to this file. The file comes back at mode 0600 in a 0700 directory; run `op whoami` to confirm.
@@ -107,7 +119,7 @@ No reapply is needed: the sudo rule does not depend on the password. Keep the it
 | ------------------------------------------ | --------------------------------------------------------------------------- |
 | Write fails with `(101) You do not have permission` | The service account lacks `write_items` in the vault. Permissions cannot be changed after creation: create a replacement service account with read and write item permissions, then rotate the token (above). |
 | chezmoi templates prompt for or reject 1Password sign-in | `[onepassword] mode` is not `service` in `~/.config/chezmoi/chezmoi.toml`, or chezmoi ran without `chezmoi-with-op`. |
-| `~/.config/op/env not found` from `with-op` or `chezmoi-with-op` | The env file is missing. See "Restore a missing env file". |
+| `~/.hermes/.op.env not found` from `with-op` or `chezmoi-with-op` | The env file is missing. See "Restore a missing env file". |
 | `op whoami` returns a non-service user     | Token in `env` is a personal token, not a service account. Rotate per above. |
 
 ## Storage pattern for binary and JSON secrets

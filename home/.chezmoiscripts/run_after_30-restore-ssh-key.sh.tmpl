@@ -21,12 +21,12 @@ load_op_token() {
     if [[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]]; then
         return 0
     fi
-    if [[ ! -f "$HOME/.config/op/env" ]]; then
+    if [[ ! -f "$HOME/.hermes/.op.env" ]]; then
         return 1
     fi
     set -a
     # shellcheck disable=SC1091
-    source "$HOME/.config/op/env" || { set +a; return 1; }
+    source "$HOME/.hermes/.op.env" || { set +a; return 1; }
     set +a
     [[ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]]
 }
@@ -89,7 +89,7 @@ ensure_github_known_hosts() {
 }
 
 if ! load_op_token; then
-    echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.config/op/env is missing or empty." >&2
+    echo "Error: OP_SERVICE_ACCOUNT_TOKEN not set and ~/.hermes/.op.env is missing or empty." >&2
     echo "       Re-run install.sh or invoke chezmoi via chezmoi-with-op." >&2
     exit 1
 fi

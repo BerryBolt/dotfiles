@@ -3,7 +3,7 @@
 # Recovery acceptance for an installed Omarchy account.
 #
 # DESTRUCTIVE to managed state, which it then restores: deletes
-# ~/.ssh/id_ed25519, ~/.config/op/env, and the passwordless sudo rule, and
+# ~/.ssh/id_ed25519, ~/.hermes/.op.env, and the passwordless sudo rule, and
 # swaps in a generated fixture key. Run only on a disposable or test account.
 # The live 1Password items and GitHub registration are never changed; the
 # rotation case simulates a machine that still holds a previous key (a
@@ -31,7 +31,7 @@ export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/local/bin:/usr/
 unset OP_SERVICE_ACCOUNT_TOKEN OP_VAULT OP_FORMAT
 
 KEY="$HOME/.ssh/id_ed25519"
-ENV_FILE="$HOME/.config/op/env"
+ENV_FILE="$HOME/.hermes/.op.env"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -114,9 +114,9 @@ check "wrappers fail clearly with neither env file nor token" no_token_fails_cle
 restore_env() {
   OP_SERVICE_ACCOUNT_TOKEN="$SUPPLIED_TOKEN" chezmoi-with-op apply --no-tty --force "$ENV_FILE" </dev/null
 }
-check "a supplied token restores ~/.config/op/env" restore_env
+check "a supplied token restores ~/.hermes/.op.env" restore_env
 check "restored env file is 0600 in a 0700 directory" \
-  test "$(stat -c '%a' "$HOME/.config/op")/$(stat -c '%a' "$ENV_FILE")" = 700/600
+  test "$(stat -c '%a' "$HOME/.hermes")/$(stat -c '%a' "$ENV_FILE")" = 700/600
 check "op works again through with-op" \
   bash -c 'with-op op whoami | grep -q "\"SERVICE_ACCOUNT\""'
 

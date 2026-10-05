@@ -53,7 +53,7 @@ Hermes writes `~/.hermes/config.yaml` the same way (its setup wizard, `/model`, 
 
 ### `private_` prefix and directory permissions
 
-Chezmoi's `private_` name prefix sets mode 0700 on a directory (0600 on a file). The prefix applies to the path component it sits on, so place it on the narrowest directory that needs protection. `~/.config/op/` holds the service-account token and is `dot_config/private_op/`, which renders 0700 while `~/.config` keeps Omarchy's mode.
+Chezmoi's `private_` name prefix sets mode 0700 on a directory (0600 on a file). The prefix applies to the path component it sits on, so place it on the narrowest directory that needs protection. The service-account environment is `private_dot_hermes/private_dot_op.env.tmpl`, which renders `~/.hermes/.op.env` at mode 0600 inside the existing private Hermes directory.
 
 When adding a new private subtree, put `private_` on that subtree, not on a shared parent such as `dot_config`.
 
@@ -91,9 +91,9 @@ chezmoi-with-op diff
 chezmoi-with-op cat ~/.gitconfig
 ```
 
-Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env`, `~/.claude/settings.json`, or `~/.hermes/.env` in logged sessions; their output contains a token.
+Do not `cat` or `diff` secret-bearing targets such as `~/.hermes/.op.env`, `~/.claude/settings.json`, or `~/.hermes/.env` in logged sessions; their output contains a token.
 
-`chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.config/op/env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
+`chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.hermes/.op.env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
 
 If you forget and run bare `chezmoi apply`, you'll see:
 
@@ -180,7 +180,7 @@ Available in `.tmpl` files:
 | `{{ .chezmoi.hostname }}`         | Machine hostname                           |
 | `{{ .chezmoi.username }}`         | Current OS user                            |
 
-The 1Password service account token is NOT a chezmoi data value. It is read from the chezmoi process env at render time via `{{ env "OP_SERVICE_ACCOUNT_TOKEN" }}` in [private_env.tmpl](../home/dot_config/private_op/private_env.tmpl). See [ARCHITECTURE.md](../ARCHITECTURE.md#secrets-model) for why.
+The 1Password service account token is NOT a chezmoi data value. It is read from the chezmoi process env at render time via `{{ env "OP_SERVICE_ACCOUNT_TOKEN" }}` in [private_dot_op.env.tmpl](../home/private_dot_hermes/private_dot_op.env.tmpl). See [ARCHITECTURE.md](../ARCHITECTURE.md#secrets-model) for why.
 
 Inspect available variables:
 

@@ -1,0 +1,2 @@
+# Retire the former credential location after adopting Hermes' native env file.
+.config/op/env
