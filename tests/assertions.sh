@@ -256,6 +256,19 @@ check "lingering keeps the gateway running without a login" \
   test "$(loginctl show-user "$(id -un)" --property=Linger --value)" = yes
 check "the gateway runs the pinned Hermes and is connected to Telegram" gateway_connected
 
+echo "T3 Code"
+T3_VERSION=$(sed -n 's/^T3_VERSION=//p' \
+  "$SOURCE_DIR/home/.chezmoiscripts/run_once_after_70-install-t3.sh")
+
+check "t3 is at the version pinned in apply script 70" \
+  test "$(t3 --version)" = "t3 v$T3_VERSION"
+check "the T3 Code service is enabled and running" \
+  bash -c 'systemctl --user is-enabled --quiet t3code.service && systemctl --user is-active --quiet t3code.service'
+check "the T3 Code service is installed at the pinned version" \
+  bash -c 't3 service status | grep -qF "Status: installed · t3@$1"' _ "$T3_VERSION"
+check "the T3 Code service keeps local network access off" \
+  grep -qE '^T3CODE_LAN="?false"?$' "$HOME/.t3/service.env"
+
 echo "Git identity and signing"
 check "git email is the agent email" \
   test "$(git config --global user.email)" = "$CHEZMOI_AGENT_EMAIL"
