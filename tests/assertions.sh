@@ -186,9 +186,15 @@ print(check_command_security(sys.argv[1])["action"])' "$1" 2>/dev/null)
 hermes_uses_brain() {
   (cd "$HERMES_DIR" && venv/bin/python -c 'import sys; sys.path.insert(0, ".")
 from hermes_cli.config import load_config
-from agent.skill_utils import get_all_skills_dirs
-brain = sys.argv[1]
-ok = load_config()["terminal"]["cwd"] == brain and any(str(d) == brain + "/skills" for d in get_all_skills_dirs())
+from pathlib import Path
+from agent.skill_utils import get_external_skills_dirs
+from agent.skill_commands import scan_skill_commands
+brain = Path(sys.argv[1])
+skills = (brain / "skills").resolve()
+ok = (load_config()["terminal"]["cwd"] == str(brain)
+      and skills in [d.resolve() for d in get_external_skills_dirs()]
+      and any(Path(c["skill_md_path"]).resolve().is_relative_to(skills)
+              for c in scan_skill_commands().values()))
 sys.exit(0 if ok else 1)' "$WORKSPACE_DIR" 2>/dev/null)
 }
 

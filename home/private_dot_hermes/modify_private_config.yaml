@@ -56,6 +56,18 @@
 {{- $brain := joinPath .chezmoi.homeDir "brain" -}}
 {{- $declared = set $declared "terminal.cwd" $brain -}}
 {{- $declared = set $declared "skills.create_dir" (joinPath $brain "skills") -}}
+{{- /* The command/preload scanner reads external_dirs, not create_dir.
+       Append the canonical workspace root and preserve other skill roots. */ -}}
+{{- $externalSkills := dig "skills" "external_dirs" (list) $config -}}
+{{- if kindIs "string" $externalSkills -}}
+{{-   $externalSkills = list $externalSkills -}}
+{{- else if not (kindIs "slice" $externalSkills) -}}
+{{-   fail "skills.external_dirs must be a path or list of paths" -}}
+{{- end -}}
+{{- if not (has (joinPath $brain "skills") $externalSkills) -}}
+{{-   $externalSkills = append $externalSkills (joinPath $brain "skills") -}}
+{{- end -}}
+{{- $declared = set $declared "skills.external_dirs" $externalSkills -}}
 {{- $converged := true -}}
 {{- range $path, $value := $declared -}}
 {{-   $node := $config -}}
