@@ -1,0 +1,8 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /* T3 writes this settings file. Keep its other local settings. */ -}}
+{{- $settings := dict -}}
+{{- if .chezmoi.stdin -}}
+{{-   $settings = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- $settings = setValueAtPath "favorites" (list (dict "provider" "codex" "model" "gpt-6.1-sol")) $settings -}}
+{{ toPrettyJson $settings }}
