@@ -3,6 +3,7 @@
 # exporting it to the calling shell.
 #
 #   with-op op whoami
+#   with-op item get <item>  # Hermes' browser vault, scoped to the vault
 #   with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
 
 set -eu
@@ -28,5 +29,25 @@ set -a
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 set +a
+
+# Hermes runs its configured op binary with item subcommands and no leading
+# `op`. It only reads through this form, so nothing else is allowed here.
+if [ "$1" = item ]; then
+    case "${2:-}" in
+        list|get) ;;
+        *) echo "error: direct item mode supports only list and get." >&2; exit 2 ;;
+    esac
+    : "${OP_VAULT:?the credential env file must set OP_VAULT}"
+    # Hermes parses plain text from password and one-time-code reads, and
+    # passes --format json itself for lists.
+    unset OP_FORMAT
+    # A service account must name a vault; op ignores OP_VAULT for items.
+    for arg in "$@"; do
+        case "$arg" in
+            --vault|--vault=*) exec op "$@" ;;
+        esac
+    done
+    exec op "$@" --vault "$OP_VAULT"
+fi
 
 exec "$@"

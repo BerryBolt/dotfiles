@@ -61,11 +61,13 @@ Hermes reaches Codex through its own device login in `~/.hermes/auth.json`, not 
 
 Apply writes Hermes' Telegram settings into `~/.hermes/.env` (mode 0600), which Hermes reads whoever starts it: the bot token from the `Telegram Bot - API key` item's `credential` field, and the owner's Telegram user ID from its `owner user ID` field, as both the only allowed user and the home chat for deliveries; and the Brave Search API key for web search from the `Brave Search - API key` item's `credential` field. Hermes and its setup wizard write other lines to the file; apply keeps them.
 
+Hermes' browser vault reads 1Password through `with-op`, so the service-account token stays out of Hermes' process. See [Hermes browser credentials](../runbooks/1password-service-account.md#hermes-browser-credentials).
+
 ## Environment setup
 
 Required environment variables for `op`:
 - `OP_SERVICE_ACCOUNT_TOKEN` — service account token (MUST NOT log or print)
-- `OP_VAULT` — default vault name
+- `OP_VAULT` — configured vault name; `op` does not read it for item commands, so pass it with `--vault`
 - `OP_FORMAT` — default CLI output format; use `json` in this environment
 
 Single source of truth: **`~/.config/op/env`** holds all three. It is chezmoi-managed at mode 0600 and is NEVER sourced into a parent shell. The wrappers load it into a one-shot child process for the duration of a single command:
@@ -214,7 +216,7 @@ Rules:
 
 ## Workflows (strict order)
 
-All command snippets below use the `op` shell wrapper, which loads `~/.config/op/env` into a subshell on each call. Because `OP_VAULT` and `OP_FORMAT` are set inside that subshell, you do NOT pass `--vault` or `--format` explicitly — `op` picks them up from the subshell env. See Environment setup.
+All command snippets below use the `op` shell wrapper, which loads `~/.config/op/env` into a subshell on each call. `OP_FORMAT` sets the output format. Item commands need `--vault "<vault>"`, because a service account must name a vault and `op` does not read `OP_VAULT` for them. The snippets below show the structure of each operation, so add the vault flag. See Environment setup.
 
 ### Before ANY create operation
 
@@ -380,7 +382,7 @@ with-op bash -c 'op read "op://$OP_VAULT/GitHub/password"'
 
 ### Create
 
-The wrapper's subshell has `OP_VAULT` set, so `op` targets it by default — no `--vault` flag needed.
+Pass `--vault "<vault>"` to item creation commands.
 
 ```bash
 # Login
