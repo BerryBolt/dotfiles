@@ -337,14 +337,15 @@ check "~/brain reaches its origin over SSH (ls-remote origin)" \
 
 echo "Repository synchronization"
 check "berry-sync is executable" test -x "$HOME/.local/bin/berry-sync"
-check "Hermes has one script-only sync job" bash -c '
+check "Hermes has one gated sync repair job" bash -c '
   cd "$HOME/.hermes/hermes-agent" || exit 1
   .venv/bin/python - <<"PYTHON"
 from cron.jobs import list_jobs
 jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "dotfiles-berry-sync"]
 assert len(jobs) == 1
 job = jobs[0]
-assert job.get("no_agent") is True
+assert job.get("no_agent") is False
+assert "Preserve other sessions" in job.get("prompt", "")
 assert job.get("script") == "berry-sync.sh"
 assert job.get("schedule", {}).get("expr") == "*/5 * * * *"
 assert job.get("deliver") == "local"

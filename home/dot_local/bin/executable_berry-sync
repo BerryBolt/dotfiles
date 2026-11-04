@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fast-forward the workstation repositories and retry unapplied setup changes."""
 import fcntl
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -16,7 +17,8 @@ def run(*args):
     result = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL, text=True, timeout=1800)
     if result.returncode:
-        raise RuntimeError("command failed")
+        operation = args[0] + (" " + args[3] if args[0] == "git" else "")
+        raise RuntimeError(operation + " exited " + str(result.returncode))
     return result.stdout.strip()
 
 
@@ -39,7 +41,6 @@ def sync(repo, apply=False):
         raise Deferred("branch changed during fetch")
     if git("status", "--porcelain", "--untracked-files=all"):
         raise Deferred("checkout changed during fetch")
-    before = git("rev-parse", "HEAD")
     ahead, _ = map(int, git("rev-list", "--left-right", "--count", "HEAD...@{upstream}").split())
     if ahead:
         raise Deferred("checkout ahead or diverged")
@@ -63,7 +64,7 @@ def sync(repo, apply=False):
             temp = state / "applied-sha.tmp"
             temp.write_text(sha + "\n")
             temp.replace(marker)
-    if not scheduled or before != sha:
+    if not scheduled:
         print("berry-sync: " + ("dotfiles" if apply else "brain") + " complete")
 
 
@@ -82,9 +83,12 @@ def main():
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            print("berry-sync: another run is active", file=sys.stderr)
+            if scheduled:
+                print(json.dumps({"wakeAgent": False, "status": "sync already active"}))
+            else:
+                print("berry-sync: another run is active", file=sys.stderr)
             return 0 if scheduled else 1
-        failed = False
+        issues = []
         # Resolve each checkout separately so one failure never blocks the other.
         for name in ("brain", "dotfiles"):
             try:
@@ -92,13 +96,27 @@ def main():
                 repo = Path(run("git", "-C", str(repo), "rev-parse", "--show-toplevel"))
                 sync(repo, apply=name == "dotfiles")
             except Deferred as error:
-                print("berry-sync: " + name + ": " + str(error), file=sys.stderr)
-                failed = failed or not scheduled
-            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
-                print("berry-sync: " + name + " skipped or failed; inspect checkout and apply locally", file=sys.stderr)
-                failed = True
-        return int(failed)
+                issues.append({"repo": name, "reason": str(error)})
+            except RuntimeError as error:
+                issues.append({"repo": name, "reason": str(error)})
+            except Exception:
+                # Exception text can contain command output, paths, or credentials.
+                issues.append({"repo": name, "reason": "unexpected sync failure; inspect locally"})
+        if scheduled:
+            print(json.dumps({"wakeAgent": bool(issues), "issues": issues}))
+            return 0
+        for issue in issues:
+            print("berry-sync: " + issue["repo"] + ": " + issue["reason"], file=sys.stderr)
+        return int(bool(issues))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception:
+        if sys.argv[1:] == ["--scheduled"]:
+            print(json.dumps({"wakeAgent": True, "issues": [
+                {"repo": "sync", "reason": "unexpected setup failure; inspect locally"}]}))
+            sys.exit(0)
+        print("berry-sync: unexpected setup failure; inspect locally", file=sys.stderr)
+        sys.exit(1)

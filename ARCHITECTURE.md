@@ -112,7 +112,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Safe resumption
 
-A new workstation's Hermes gateway starts live: it takes Telegram turns as soon as it connects. Apply registers a script-only repository synchronization job every five minutes. It only fast-forwards clean tracking branches and applies dotfiles without forcing target conflicts. See [repository synchronization](runbooks/berry-sync.md) for retries and acceptance limits.
+A new workstation's Hermes gateway starts live: it takes Telegram turns as soon as it connects. Apply registers a gated repository synchronization and repair job every five minutes. It only fast-forwards clean tracking branches and applies dotfiles without forcing target conflicts. See [repository synchronization](runbooks/berry-sync.md) for retries and acceptance limits.
 
 ## Validation
 
