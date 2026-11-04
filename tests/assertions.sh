@@ -240,6 +240,25 @@ for instruction_file in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md"; do
 done
 check "Hermes starts gateway sessions in ~/brain and loads its skills" hermes_uses_brain
 
+# The browser vault as Hermes builds it, from a clean environment. It prints
+# nothing, so the password it resolves stays out of the log.
+hermes_vault_reads_without_token() {
+  (cd "$HERMES_DIR" && env -u OP_SERVICE_ACCOUNT_TOKEN -u OP_VAULT -u OP_FORMAT \
+    venv/bin/python -c 'import os, sys; sys.path.insert(0, ".")
+from hermes_cli.env_loader import load_hermes_dotenv
+load_hermes_dotenv()
+from agent.vault_backends import enabled_backends
+backend = next(b for b in enabled_backends() if b.name == "onepassword")
+assert backend.is_unlocked()
+login = next(m for m in backend.list_items() if "github.com" in m.origin)
+assert backend.resolve_password(login.id)
+assert "OP_SERVICE_ACCOUNT_TOKEN" not in os.environ' >/dev/null 2>&1)
+}
+check "Hermes' browser vault reads 1Password with no token in its process" hermes_vault_reads_without_token
+check "Hermes has no 1Password token file of its own" test ! -e "$HOME/.hermes/.op.env"
+check "~/.hermes/.env holds no 1Password token" \
+  bash -c '! grep -qE "^OP_SERVICE_ACCOUNT_TOKEN=|ops_" "$1"' _ "$HOME/.hermes/.env"
+
 # The gateway records its own state. An apply restarts it in the background,
 # so allow it time to reconnect.
 gateway_connected() {

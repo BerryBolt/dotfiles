@@ -44,6 +44,14 @@ Expected:
 - `op vault list --permission write_items` includes the target vault, so the agent can store the credentials it creates.
 - Secrets can be read without an interactive sign-in.
 
+## Hermes browser credentials
+
+Hermes' browser vault runs `~/.local/bin/with-op` as its `op` binary (`vault.onepassword.binary_path`), as `with-op item list ...` and `with-op item get ...`. The wrapper loads the token for that call and adds `--vault "$OP_VAULT"` unless the caller passed a vault. The token stays out of Hermes' process and the commands Hermes starts. Those commands can still run `with-op` or read `~/.config/op/env`, because they run as the same account.
+
+Hermes treats the backend as locked until the variable named by `vault.onepassword.service_account_token_env` is set. `~/.hermes/.env` therefore sets `HERMES_OP_AUTH_IN_WRAPPER=with-op`, which is not a credential. Hermes passes that value to the wrapper as `OP_SERVICE_ACCOUNT_TOKEN`, and the wrapper replaces it with the real token. If `~/.config/op/env` is missing, the wrapper exits before `op` runs. Drop the marker if Hermes gains its own option for wrappers that handle authentication (proposed upstream in NousResearch/hermes-agent#116961).
+
+Hermes resolves passwords by the field label `password`, so a Login item needs its password field labeled exactly that.
+
 ## Rotate the token
 
 The token is not stored in chezmoi data. Supply the new token to `chezmoi-with-op` for one apply; it takes precedence over the old value in the file and re-renders `~/.config/op/env`.
