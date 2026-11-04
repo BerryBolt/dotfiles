@@ -233,6 +233,11 @@ check "Hermes' scanner fails closed without tirith" \
   test "$(TIRITH_BIN=/nonexistent/tirith hermes_scan 'echo hello')" = block
 check "~/.hermes/SOUL.md links to the brain's persona" \
   test "$(readlink "$HOME/.hermes/SOUL.md")" = "$WORKSPACE_DIR/SOUL.md"
+for instruction_file in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md"; do
+  check "$instruction_file links to the workspace writing policy" \
+    test "$(readlink "$instruction_file")" = "$WORKSPACE_DIR/policies/writing.md"
+  check "$instruction_file has a readable policy target" test -r "$instruction_file"
+done
 check "Hermes starts gateway sessions in ~/brain and loads its skills" hermes_uses_brain
 
 # The gateway records its own state. An apply restarts it in the background,
