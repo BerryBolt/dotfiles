@@ -31,7 +31,7 @@ def observe(repo, apply=False):
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
-                issue('observation', 'publisher active; observation incomplete')
+                counts['publisher_active'] = True
                 return issues, counts, False
             original = git('rev-parse', 'HEAD')
             branch = git('branch', '--show-current')
@@ -49,20 +49,35 @@ def observe(repo, apply=False):
             counts['secondary_worktrees'] = len(secondary)
             counts['secondary_dirty'] = 0
             counts['secondary_detached'] = 0
+            counts['secondary_unavailable'] = 0
             for path in secondary:
-                if run('git', '-C', str(path), 'status', '--porcelain', '--untracked-files=all'):
+                try:
+                    dirty = run('git', '-C', str(path), 'status', '--porcelain', '--untracked-files=all')
+                    detached = not run('git', '-C', str(path), 'branch', '--show-current')
+                except (RuntimeError, OSError, subprocess.TimeoutExpired):
+                    counts['secondary_unavailable'] += 1
+                    continue
+                if dirty:
                     counts['secondary_dirty'] += 1
-                if not run('git', '-C', str(path), 'branch', '--show-current'):
+                if detached:
                     counts['secondary_detached'] += 1
             if counts['secondary_dirty'] or counts['secondary_detached']:
                 issue('publication', 'secondary worktrees require ownership review')
+            if counts['secondary_unavailable']:
+                issue('publication', 'secondary worktrees unavailable; inspect their registrations locally')
             # Fetch before deciding whether local edits permit integration.
-            remotes = git('remote').splitlines()
-            if not remotes:
-                raise RuntimeError('no configured remote')
-            for remote_name in remotes:
-                git('fetch', '--quiet', '--prune', remote_name)
             refs = git('for-each-ref', '--format=%(refname)%09%(upstream)%09%(upstream:remotename)%09%(upstream:remoteref)', 'refs/heads/').splitlines()
+            remotes = {line.split('\t')[2] for line in refs if len(line.split('\t')) >= 3}
+            remotes -= {'', '.'}
+            failed_remotes = set()
+            for remote_name in sorted(remotes):
+                try:
+                    git('fetch', '--quiet', '--prune', remote_name)
+                except (RuntimeError, OSError, subprocess.TimeoutExpired):
+                    failed_remotes.add(remote_name)
+            counts['failed_remote_fetches'] = len(failed_remotes)
+            if failed_remotes:
+                issue('observation', 'tracked remote fetch failed; inspect branch upstreams and access locally')
             counts.update(branches_without_upstream=0, branches_ahead=0, branches_diverged=0, unpushed_commits=0)
             remote, destination, ahead, behind = None, None, None, None
             for line in refs:
@@ -94,18 +109,23 @@ def observe(repo, apply=False):
                 issue('publication', 'checkout detached')
             elif not remote or remote == '.' or ahead is None:
                 issue('publication', 'checkout lacks a remote upstream')
-            if apply and branch and remote and remote != '.':
+            setup_branch_allowed = not apply
+            if remote in failed_remotes:
+                issue('observation', 'checkout upstream fetch failed; integration and setup apply deferred')
+            elif apply and branch and remote and remote != '.':
                 default_lines = git('ls-remote', '--symref', remote, 'HEAD').splitlines()
                 defaults = [line.split()[1] for line in default_lines if line.startswith('ref: ')]
                 if len(defaults) != 1:
                     issue('publication', 'remote default branch is ambiguous')
                 elif 'refs/heads/' + branch != defaults[0] or destination != defaults[0]:
                     issue('publication', 'setup apply requires the remote default branch')
-            complete = True
+                else:
+                    setup_branch_allowed = True
+            complete = not failed_remotes
             # Never integrate a dirty, detached, ahead, or non-default setup checkout.
-            blocked = bool(counts['modified'] or counts['untracked'] or not branch or ahead is None or ahead)
-            if apply and any(i['category'] == 'publication' for i in issues):
-                blocked = True
+            blocked = bool(counts['modified'] or counts['untracked'] or not branch
+                           or not remote or remote == '.' or remote in failed_remotes
+                           or ahead is None or ahead or not setup_branch_allowed)
             if not blocked:
                 if git('rev-parse', 'HEAD') != original or git('branch', '--show-current') != branch or git('status', '--porcelain', '--untracked-files=all'):
                     raise RuntimeError('checkout changed during observation')
@@ -161,7 +181,9 @@ def should_wake(name, issues, complete):
             previous[category] = record
         elif complete:
             # An incomplete or failed fetch must never clear a publication incident.
-            previous.pop(category, None)
+            # Retain the cooldown when a cleared problem returns within the hour.
+            if category in previous:
+                record['observations'] = 0
         elif category in previous:
             record['observations'] = 0
     save(notice, json.dumps(previous))
@@ -198,7 +220,8 @@ def main():
             if scheduled:
                 wake = should_wake(name, found, complete) or wake
         print(json.dumps({'wakeAgent': wake if scheduled else False, 'issues': issues, 'diagnostics': diagnostics}))
-        return 0 if scheduled else int(bool(issues))
+        incomplete = any(not counts['complete'] for counts in diagnostics.values())
+        return 0 if scheduled else int(bool(issues) or incomplete)
 
 
 if __name__ == '__main__':
