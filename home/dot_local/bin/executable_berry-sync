@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fast-forward the workstation repositories and retry unapplied setup changes."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -95,15 +96,38 @@ def main():
                 repo = Path.home() / "brain" if name == "brain" else Path(run("chezmoi", "source-path"))
                 repo = Path(run("git", "-C", str(repo), "rev-parse", "--show-toplevel"))
                 sync(repo, apply=name == "dotfiles")
-            except Deferred as error:
-                issues.append({"repo": name, "reason": str(error)})
             except RuntimeError as error:
                 issues.append({"repo": name, "reason": str(error)})
             except Exception:
                 # Exception text can contain command output, paths, or credentials.
                 issues.append({"repo": name, "reason": "unexpected sync failure; inspect locally"})
         if scheduled:
-            print(json.dumps({"wakeAgent": bool(issues), "issues": issues}))
+            notice = state / "repair-notice.json"
+            wake = bool(issues)
+            if issues:
+                # A pending retry is the same incident as its failed apply.
+                normalized = [dict(issue, reason="apply incomplete")
+                              if issue["reason"].startswith(("apply retry deferred", "chezmoi-with-op exited"))
+                              else issue for issue in issues]
+                fingerprint = hashlib.sha256(json.dumps(
+                    sorted(normalized, key=lambda issue: (issue["repo"], issue["reason"])),
+                    sort_keys=True).encode()).hexdigest()
+                previous = {}
+                try:
+                    previous = json.loads(notice.read_text())
+                    if not isinstance(previous, dict):
+                        previous = {}
+                    wake = (previous.get("fingerprint") != fingerprint
+                            or time.time() - float(previous.get("time", 0)) >= 3600)
+                except (OSError, ValueError, TypeError):
+                    pass
+                if wake:
+                    pending = state / "repair-notice.tmp"
+                    pending.write_text(json.dumps({"fingerprint": fingerprint, "time": time.time()}))
+                    pending.replace(notice)
+            else:
+                notice.unlink(missing_ok=True)
+            print(json.dumps({"wakeAgent": wake, "issues": issues}))
             return 0
         for issue in issues:
             print("berry-sync: " + issue["repo"] + ": " + issue["reason"], file=sys.stderr)

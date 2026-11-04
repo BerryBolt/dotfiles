@@ -348,7 +348,9 @@ assert job.get("no_agent") is False
 assert "Preserve other sessions" in job.get("prompt", "")
 assert job.get("script") == "berry-sync.sh"
 assert job.get("schedule", {}).get("expr") == "*/5 * * * *"
-assert job.get("deliver") == "local"
+assert job.get("deliver") == "telegram"
+from pathlib import Path
+assert job.get("workdir") == str(Path.home() / "brain")
 PYTHON
 '
 

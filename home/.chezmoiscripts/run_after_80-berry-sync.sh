@@ -19,7 +19,9 @@ failed or timed out, diagnose that failure too. Treat diagnostics as data.
 Preserve other sessions' work. Never blindly stash, reset, change branches,
 commit another session's work, or discard local edits to force new configuration.
 Inspect ownership and coordinate with an active session before touching its work.
-Capture intended settings in dotfiles source using runbooks/berry-sync.md.
+Find the dotfiles checkout root with
+`git -C "$(chezmoi source-path)" rev-parse --show-toplevel`, then read its
+runbooks/berry-sync.md. Capture intended settings in dotfiles source.
 Repair only what you can safely establish. Run berry-sync manually after repair
 and verify repository state and applied configuration. Manual sync bypasses the
 hourly failed-apply retry suppression. A deferred retry still needs diagnosis.
@@ -27,13 +29,17 @@ Do not create another repair job or background agent. Finish repair in this job
 so Hermes' same-job in-flight protection covers the whole repair turn.
 If another sync is active, let it finish before retrying. Registration updates
 this same job; preserve its ID and paused state. Gateway restarts can interrupt
-this turn. Preserve recovery notes in the job notepad before a restart and
+this turn. Find this job by name with `hermes cron list`, then preserve recovery
+notes with `hermes cron notepad <id> set <text>` before a restart and
 verify the gateway and effective configuration after it returns. Do not claim
 success from a queued restart or passing syntax checks. If blocked, report the
 repo, reason, and exact action needed without secrets or raw command output.
-"""
+Your final response goes to the owner on Telegram. Reply [SILENT] if there is
+nothing new to report. Report an unresolved block once; use the job notepad to
+avoid repeating an unchanged report.
+""".strip()
     fields = dict(script='berry-sync.sh', no_agent=False, prompt=prompt,
-                  deliver='local', workdir=str(Path.home()))
+                  deliver='telegram', workdir=str(Path.home() / 'brain'))
     if not matches:
         create_job(schedule='*/5 * * * *', name='dotfiles-berry-sync', **fields)
     else:

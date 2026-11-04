@@ -108,7 +108,7 @@ Acceptance testing installs a pushed candidate from the public GitHub repository
 
 ## Repository synchronization
 
-Run `berry-sync` to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes script-only job every five minutes. See [skip, retry, and configuration reload behavior](runbooks/berry-sync.md).
+Run `berry-sync` to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. See [skip, retry, and configuration reload behavior](runbooks/berry-sync.md).
 
 ## License
 

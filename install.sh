@@ -17,7 +17,7 @@ BOOTSTRAP_TOOLS=(chezmoi@latest 1password-cli@latest)
 
 # System prerequisites supplied by Omarchy. The installer checks them and
 # never installs them.
-REQUIRED_COMMANDS=(git ssh ssh-keygen mise flock)
+REQUIRED_COMMANDS=(git ssh ssh-keygen mise flock python3)
 
 usage() {
   cat <<'EOF'

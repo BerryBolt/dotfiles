@@ -1,40 +1,42 @@
 # Repository synchronization
 
-## Automatic behavior
+Your Hermes job `dotfiles-berry-sync` checks brain and dotfiles every five minutes while the gateway runs. Successful checks stay silent. A blocked or failed sync wakes you to prioritize repair. An unchanged issue wakes you at most hourly. Hermes keeps the repair in the same job to prevent overlapping repair turns.
 
-The Hermes job `dotfiles-berry-sync` checks `~/brain` and the chezmoi source every five minutes. Clean tracking branches advance by fast-forward. Dotfiles applies with closed stdin and `--force=false`. Successful checks are silent. Blocked or failed checks wake the agent in the same job with the repository and a sanitized reason. Hermes keeps that job in flight throughout repair, so repeated ticks do not start concurrent repairs. Registration preserves its ID and paused state.
+## Fix blocked sync
 
-Dirty, detached, ahead, and diverged checkouts need repair or coordination with their owner. They are never automatically stashed, reset, committed, or pushed. An active sync or installer holds a shared lock and causes a silent scheduled skip. Other editors and manual chezmoi commands do not honor that lock.
+Inspect the named repository and reason. Preserve other sessions' edits and coordinate with their owner. Commit and push your own completed work. Resolve divergence after inspecting both sides. Never stash, reset, or discard someone else's work to make sync pass.
 
-Failed or interrupted applies retry at the same SHA at most hourly on schedule. The agent still wakes to diagnose a deferred retry. A new SHA or manual run retries immediately. The successful SHA in `~/.local/state/berry-sync/applied-sha`, under `XDG_STATE_HOME` when set, suppresses another apply at that SHA. Use manual chezmoi apply for target repairs or secret rotation without a source change.
-
-## Manual sync and repair
+Run sync immediately after repair:
 
 ```bash
 berry-sync
 ```
 
-A manual run exits nonzero when incomplete. Prioritize repair, inspect the named repository, and preserve other sessions' work. Coordinate before touching an active session's edits. Never discard edits to deploy new configuration. Git and apply errors expose only the command name and exit code, not raw output that may contain secrets.
+A nonzero exit means sync is incomplete. Verify the repository state and applied configuration before calling the repair complete. Manual sync retries a failed apply immediately. Scheduled applies retry the same commit at most hourly.
 
-After repair, run `berry-sync` again and verify the repository state and effective configuration. Apply can make partial progress. A newly managed path has no recorded chezmoi state and may replace existing content without prompting. Inspect its destination and preserve content before publishing it.
+If you need the owner, report the repository, reason, and exact action needed. The job delivers your final response to Telegram. Reply `[SILENT]` when nothing new needs reporting. Use the job notepad to avoid repeating unchanged reports.
 
-## Capture configuration choices
+For an apply failure, inspect the error locally by running `chezmoi-with-op --no-tty --force=false apply`. Treat its output as sensitive. Do not copy credentials, rendered files, or raw command output into reports.
 
-For a whole non-template file, capture the live choice into source:
+## Save configuration choices
+
+Prefer changing dotfiles source first, then applying it. To capture a live change to a whole non-template file, run:
 
 ```bash
 chezmoi re-add ~/.some-config
 ```
 
-For shared configuration, edit the source template and add the intended setting to its declared keys:
+For shared configuration, find its source template and edit the returned path with your file-editing tool:
 
 ```bash
-chezmoi edit ~/.hermes/config.yaml
-chezmoi edit ~/.codex/config.toml
-chezmoi edit ~/.claude/settings.json
+chezmoi source-path ~/.hermes/config.yaml
+chezmoi source-path ~/.codex/config.toml
+chezmoi source-path ~/.claude/settings.json
 ```
 
-Review the source change locally, commit only your changes, and push. Never capture runtime state or secrets. Do not print secret-bearing rendered files or diffs into logs. Apply and verify:
+Add only the intended setting to the template's declared keys. Preserve unrelated settings. Review the source diff, commit your changes, and push. Never capture secrets or runtime state.
+
+Apply and verify your configuration:
 
 ```bash
 chezmoi-with-op --no-tty --force=false apply
@@ -42,8 +44,12 @@ chezmoi-with-op verify --exclude=scripts
 berry-sync
 ```
 
-## Recovery limits and acceptance
+Before adding a newly managed path, inspect its destination and preserve existing content. Chezmoi may replace that content without prompting.
 
-A stopped gateway cannot check or wake an agent. Recover it manually. A queued gateway restart is not proof that new configuration loaded. Restarts or Hermes upgrades can interrupt repair. Preserve recovery notes before restarting, then verify the gateway and its effective configuration. Pinned detached installations need an operator to select a tracking branch.
+## Recover the gateway
 
-On an authorized disposable Omarchy account, extend the existing acceptance run with silent success, dirty and detached checkouts, ahead and diverged branches, failed apply, deferred retry, manual retry, and an unexpected script failure. Confirm each issue wakes repair with its repo and reason. Keep a repair turn active across multiple ticks and confirm no second repair starts. Apply twice and confirm one job with the same ID, unchanged unrelated jobs, and preserved paused state. Exercise a script update, gateway restart, and Hermes upgrade during sync, then verify recovery. Local syntax checks and source inspection do not prove these deployed behaviors.
+A stopped gateway cannot sync or wake you. Recover it manually, then run `berry-sync`. Verify the gateway and effective configuration after a restart. Pulling brain files does not prove that an existing conversation loaded its new instructions.
+
+Before restarting during repair, find `dotfiles-berry-sync` with `hermes cron list` and save recovery notes with `hermes cron notepad <id> set <text>`.
+
+A pinned detached installation requires an operator to select its intended tracking branch. Report this block rather than choosing a branch yourself.
