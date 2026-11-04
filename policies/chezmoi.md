@@ -26,8 +26,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── modify_dot_bashrc        # additive block in Omarchy's ~/.bashrc
 │   ├── modify_private_dot_claude.json  # onboarding flag in ~/.claude.json (0600)
 │   ├── dot_gitconfig.tmpl
-│   ├── dot_claude/              # modify template for settings.json (0600)
-│   ├── dot_codex/               # modify template for config.toml
+│   ├── dot_claude/              # modify template for settings.json (0600), CLAUDE.md link
+│   ├── dot_codex/               # modify template for config.toml, AGENTS.md link
 │   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600), SOUL.md link
 │   ├── .chezmoiignore           # skips the SOUL.md link until ~/brain is cloned
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/, systemd/user/ (gateway drop-in)
@@ -38,6 +38,12 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 ├── skills/
 └── tests/
 ```
+
+### Shared writing instructions
+
+The workspace owns `~/brain/policies/writing.md`. Codex's `~/.codex/AGENTS.md` and Claude Code's `~/.claude/CLAUDE.md` link to it. Publish and pull the workspace policy before applying these links to an existing workstation. Inspect both destination files first and preserve any existing instructions before replacing them.
+
+On a fresh install, the links initially have no target and resolve after the installer clones the workspace. They need no second apply. Acceptance checks require the policy to exist. Verify that each CLI loads it in a fresh session before relying on it.
 
 ### Extending files that others also write
 
