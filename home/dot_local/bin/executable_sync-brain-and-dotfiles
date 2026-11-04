@@ -14,7 +14,7 @@ def run(*args):
                             stderr=subprocess.DEVNULL, text=True, timeout=1800)
     if result.returncode:
         raise RuntimeError(args[0] + ' operation failed; inspect locally')
-    return result.stdout.strip()
+    return result.stdout.rstrip('\n')
 
 
 def observe(repo, apply=False):
@@ -67,8 +67,8 @@ def observe(repo, apply=False):
             remote, destination, ahead, behind = None, None, None, None
             for line in refs:
                 fields = line.split('\t')
-                ref, upstream = fields[:2]
                 fields += [''] * (4 - len(fields))
+                ref, upstream = fields[:2]
                 local_ahead = local_behind = None
                 if not upstream:
                     counts['branches_without_upstream'] += 1
