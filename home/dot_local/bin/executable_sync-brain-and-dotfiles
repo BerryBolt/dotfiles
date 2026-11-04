@@ -61,7 +61,7 @@ def observe(repo, apply=False):
             if not remotes:
                 raise RuntimeError('no configured remote')
             for remote_name in remotes:
-                git('fetch', '--quiet', remote_name)
+                git('fetch', '--quiet', '--prune', remote_name)
             refs = git('for-each-ref', '--format=%(refname)%09%(upstream)%09%(upstream:remotename)%09%(upstream:remoteref)', 'refs/heads/').splitlines()
             counts.update(branches_without_upstream=0, branches_ahead=0, branches_diverged=0, unpushed_commits=0)
             remote, destination, ahead, behind = None, None, None, None
