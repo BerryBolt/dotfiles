@@ -26,8 +26,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── modify_dot_bashrc        # additive block in Omarchy's ~/.bashrc
 │   ├── modify_private_dot_claude.json  # onboarding flag in ~/.claude.json (0600)
 │   ├── dot_gitconfig.tmpl
-│   ├── dot_claude/              # modify template for settings.json (0600), CLAUDE.md link
-│   ├── dot_codex/               # modify template for config.toml, AGENTS.md link
+│   ├── dot_claude/              # Claude Code configuration
+│   ├── dot_codex/               # Codex configuration
 │   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600), SOUL.md link
 │   ├── .chezmoiignore           # skips the SOUL.md link until ~/brain is cloned
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/, systemd/user/ (gateway drop-in)
