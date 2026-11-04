@@ -70,7 +70,7 @@ Before adding a newly managed path, inspect its destination and preserve existin
 
 A stopped gateway cannot sync or wake you. Recover it manually, then run `sync-brain-and-dotfiles`. Verify the gateway and effective configuration after a restart. Pulling brain files does not prove that an existing conversation loaded its new instructions.
 
-Before restarting during repair, find `sync-brain-and-dotfiles` with `hermes cron list` and save recovery notes with `hermes cron notepad <id> set <text>`.
+Before restarting during repair, find `sync-brain-and-dotfiles` with `hermes cron list` and save recovery notes with `hermes cron notepad <id> set recovery <text>`.
 
 A pinned detached installation requires an operator to select its intended tracking branch. Report this block rather than choosing a branch yourself.
 

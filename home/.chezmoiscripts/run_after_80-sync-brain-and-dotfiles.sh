@@ -38,7 +38,7 @@ so Hermes' same-job in-flight protection covers the whole repair turn.
 If another sync is active, let it finish before retrying. Registration updates
 this same job; preserve its ID and paused state. Gateway restarts can interrupt
 this turn. Find this job by name with `hermes cron list`, then preserve recovery
-notes with `hermes cron notepad <id> set <text>` before a restart. Keep unresolved
+notes with `hermes cron notepad <id> set recovery <text>` before a restart. Keep unresolved
 ownership, the next action, and known task reference there. After a restart,
 verify the gateway and effective configuration after it returns. Do not claim
 success from a queued restart or passing syntax checks. If blocked, report the
