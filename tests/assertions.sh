@@ -335,6 +335,22 @@ check "~/brain is a checkout of $CHEZMOI_AGENT_WORKSPACE_REPO over SSH" \
 check "~/brain reaches its origin over SSH (ls-remote origin)" \
   env GIT_SSH_COMMAND="ssh -o BatchMode=yes" git -C "$WORKSPACE_DIR" ls-remote --exit-code origin HEAD
 
+echo "Repository synchronization"
+check "berry-sync is executable" test -x "$HOME/.local/bin/berry-sync"
+check "Hermes has one script-only sync job" bash -c '
+  cd "$HOME/.hermes/hermes-agent" || exit 1
+  .venv/bin/python - <<"PYTHON"
+from cron.jobs import list_jobs
+jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "dotfiles-berry-sync"]
+assert len(jobs) == 1
+job = jobs[0]
+assert job.get("no_agent") is True
+assert job.get("script") == "berry-sync.sh"
+assert job.get("schedule", {}).get("expr") == "*/5 * * * *"
+assert job.get("deliver") == "local"
+PYTHON
+'
+
 echo ""
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -106,6 +106,10 @@ Omarchy remains responsible for its desktop, shell defaults, and existing tools.
 
 Acceptance testing installs a pushed candidate from the public GitHub repository on a disposable Omarchy VM. Supply `OP_SERVICE_ACCOUNT_TOKEN` through ignored local configuration and use [tests/.env.local.example](tests/.env.local.example) for the remaining input names. Actual tokens, vault/account values, VM addresses, logins, and private platform records are local operational inputs.
 
+## Repository synchronization
+
+Run `berry-sync` to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes script-only job every five minutes. See [skip, retry, and configuration reload behavior](runbooks/berry-sync.md).
+
 ## License
 
 MIT

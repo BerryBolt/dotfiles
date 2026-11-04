@@ -17,7 +17,7 @@ BOOTSTRAP_TOOLS=(chezmoi@latest 1password-cli@latest)
 
 # System prerequisites supplied by Omarchy. The installer checks them and
 # never installs them.
-REQUIRED_COMMANDS=(git ssh ssh-keygen mise)
+REQUIRED_COMMANDS=(git ssh ssh-keygen mise flock)
 
 usage() {
   cat <<'EOF'
@@ -698,18 +698,30 @@ bootstrap_main() {
   export CHEZMOI_OP_ACCOUNT_ITEM="$OP_ACCOUNT_ITEM"
   export OP_SERVICE_ACCOUNT_TOKEN
 
-  install_bootstrap_tools
-  verify_credentials
-  sync_source "$repo"
-  log_info "Dotfiles source at $(git -C "$SOURCE_DIR" rev-parse HEAD)"
+  # Hold the sync lock across source changes, apply, and workspace creation.
+  # Close fd 9 inside the group so services cannot inherit the lock.
+  sync_state="${XDG_STATE_HOME:-$HOME/.local/state}/berry-sync"
+  # Only the final state directory needs the private mode.
+  # shellcheck disable=SC2174
+  mkdir -p -m 700 "$sync_state"
+  exec 9>"$sync_state/run.lock"
+  flock 9
+  {
+    install_bootstrap_tools
+    verify_credentials
+    sync_source "$repo"
+    log_info "Dotfiles source at $(git -C "$SOURCE_DIR" rev-parse HEAD)"
 
-  log_info "Applying dotfiles..."
-  if ! with_bootstrap_tools chezmoi init --apply; then
-    log_error "chezmoi apply failed"
-  fi
+    log_info "Applying dotfiles..."
+    if ! with_bootstrap_tools chezmoi init --apply; then
+      log_error "chezmoi apply failed"
+    fi
 
-  clone_workspace
-  apply_workspace_links
+    clone_workspace
+    apply_workspace_links
+  } 9>&-
+  flock -u 9
+  exec 9>&-
   sign_in_codex
   update_omarchy
 
