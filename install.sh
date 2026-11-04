@@ -700,7 +700,7 @@ bootstrap_main() {
 
   # Hold the sync lock across source changes, apply, and workspace creation.
   # Close fd 9 inside the group so services cannot inherit the lock.
-  sync_state="${XDG_STATE_HOME:-$HOME/.local/state}/berry-sync"
+  sync_state="${XDG_STATE_HOME:-$HOME/.local/state}/sync-brain-and-dotfiles"
   # Only the final state directory needs the private mode.
   # shellcheck disable=SC2174
   mkdir -p -m 700 "$sync_state"

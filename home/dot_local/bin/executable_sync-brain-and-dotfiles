@@ -66,19 +66,19 @@ def sync(repo, apply=False):
             temp.write_text(sha + "\n")
             temp.replace(marker)
     if not scheduled:
-        print("berry-sync: " + ("dotfiles" if apply else "brain") + " complete")
+        print("sync-brain-and-dotfiles: " + ("dotfiles" if apply else "brain") + " complete")
 
 
 def main():
     global state, scheduled
     if sys.argv[1:] not in ([], ["--scheduled"]):
-        print("usage: berry-sync [--scheduled]", file=sys.stderr)
+        print("usage: sync-brain-and-dotfiles [--scheduled]", file=sys.stderr)
         return 2
     scheduled = sys.argv[1:] == ["--scheduled"]
     os.environ["PATH"] = str(Path.home() / ".local/bin") + ":" + str(Path.home() / ".local/share/mise/shims") + ":" + os.environ.get("PATH", "/usr/bin:/bin")
     os.environ["GIT_TERMINAL_PROMPT"] = "0"
     os.environ["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes -o ConnectTimeout=20"
-    state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "berry-sync"
+    state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "sync-brain-and-dotfiles"
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     with (state / "run.lock").open("a") as lock:
         try:
@@ -87,7 +87,7 @@ def main():
             if scheduled:
                 print(json.dumps({"wakeAgent": False, "status": "sync already active"}))
             else:
-                print("berry-sync: another run is active", file=sys.stderr)
+                print("sync-brain-and-dotfiles: another run is active", file=sys.stderr)
             return 0 if scheduled else 1
         issues = []
         # Resolve each checkout separately so one failure never blocks the other.
@@ -130,7 +130,7 @@ def main():
             print(json.dumps({"wakeAgent": wake, "issues": issues}))
             return 0
         for issue in issues:
-            print("berry-sync: " + issue["repo"] + ": " + issue["reason"], file=sys.stderr)
+            print("sync-brain-and-dotfiles: " + issue["repo"] + ": " + issue["reason"], file=sys.stderr)
         return int(bool(issues))
 
 
@@ -142,5 +142,5 @@ if __name__ == "__main__":
             print(json.dumps({"wakeAgent": True, "issues": [
                 {"repo": "sync", "reason": "unexpected setup failure; inspect locally"}]}))
             sys.exit(0)
-        print("berry-sync: unexpected setup failure; inspect locally", file=sys.stderr)
+        print("sync-brain-and-dotfiles: unexpected setup failure; inspect locally", file=sys.stderr)
         sys.exit(1)
