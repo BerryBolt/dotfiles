@@ -35,8 +35,15 @@ and verify repository state and applied configuration. Manual sync bypasses the
 hourly failed-apply retry suppression. A deferred retry still needs diagnosis.
 Do not create another repair job or background agent. Finish repair in this job
 so Hermes' same-job in-flight protection covers the whole repair turn.
-If another sync is active, let it finish before retrying. Registration updates
-this same job; preserve its ID and paused state. Gateway restarts can interrupt
+The current `hermes cron run sync-brain-and-dotfiles` process may be your own
+repair worker. Identify your worker through the terminal shell's ancestor chain
+and exclude it from competing-owner checks. A matching process name is not proof
+that another sync owns the lock. The pre-run detector releases its run.lock before
+this repair starts. Run the direct sync command to check the actual lock instead
+of waiting on process-name matches. If a different owner really holds a required
+lock, record that blocker and return for the next bounded turn. Do not sleep or
+poll until a process exits. Registration updates this same job; preserve its ID
+and paused state. Gateway restarts can interrupt
 this turn. Find this job by name with `hermes cron list`, then preserve recovery
 notes with `hermes cron notepad <id> set recovery <text>` before a restart. Keep unresolved
 ownership, the next action, and known task reference there. After a restart,

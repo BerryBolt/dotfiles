@@ -16,7 +16,7 @@ Use the ID shown by `hermes cron list`. A dispatched run is not proof that sync 
 
 Hermes stores run documents under `~/.hermes/cron/output/<job-id>/`. Silent checks record that the agent was skipped, but do not retain detailed script output or before-and-after commits. Hermes keeps the latest 50 run documents by default. No separate sync log is maintained.
 
-Use the direct `sync-brain-and-dotfiles` command during repair or when Hermes is unavailable. It bypasses apply retry suppression and prints its result to your terminal. It does not create a Hermes history entry. Do not launch the Hermes job recursively from its repair turn.
+Use the direct `sync-brain-and-dotfiles` command during repair or when Hermes is unavailable. It bypasses apply retry suppression and prints its result to your terminal. It does not create a Hermes history entry. Do not launch the Hermes job recursively from its repair turn. Its `hermes cron run` process can be the current repair worker. Exclude your own ancestor chain when checking owners. Process-name matches do not prove lock ownership. The detector releases `run.lock` before repair. Use direct sync to check the lock. If another owner holds it, record the block and return for the next bounded turn instead of sleeping or polling.
 
 ## Fix blocked sync
 
