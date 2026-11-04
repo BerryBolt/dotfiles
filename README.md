@@ -1,6 +1,6 @@
 # Dotfiles
 
-The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the Hermes agent harness with its settings and Telegram gateway, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
+The agent's Omarchy workstation setup, managed with chezmoi: one command from a fresh Omarchy install to the complete, working account. It is delivered in increments; today it covers the fundamentals: Bash integration, scoped 1Password access, Git/SSH, mail, the Codex and Claude Code CLIs, the Hermes agent harness with its settings and Telegram gateway, T3 Code with its background service, the workspace checkout, and repeatable configuration. See [VISION.md](VISION.md) for the full scope.
 
 **Status:** fresh install, repeat install, reapply, recovery, login, and restart checks pass on a disposable Omarchy 4.0.4 (x86_64) VM.
 
@@ -30,7 +30,7 @@ Claude Code works from the token item. Codex needs two device logins that 1Passw
 curl -fsSL https://berrybolt.bot/install.sh | bash
 ```
 
-The installer prompts for missing inputs, then shows a review step. On a rerun, it reuses identity, vault, and item selectors from chezmoi configuration, the token from `~/.hermes/.op.env`, and the workspace repository from `~/brain`'s GitHub SSH origin. Environment overrides take precedence. If a device login expires, rerun the same install command and approve the new code; earlier setup stays applied.
+The installer prompts for missing inputs, then shows a review step. On a rerun, it reuses identity, vault, and item selectors from chezmoi configuration, the token from `~/.config/op/env`, and the workspace repository from `~/brain`'s GitHub SSH origin. Environment overrides take precedence. If a device login expires, rerun the same install command and approve the new code; earlier setup stays applied.
 
 For an unattended fresh install, set every input in the environment and pass `--non-interactive`. An unattended rerun can reuse saved inputs; it fails if any are missing. Keep the token inside a subshell, off the command line and out of shell history:
 
@@ -83,6 +83,7 @@ codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
 claude -p "..."              # Opus 5.5 on the subscription token
 hermes auth add openai-codex --type oauth  # when not signed in (an attended install runs it): Hermes' own Codex login
 hermes -z "..."               # GPT-6 Luna through Hermes' own sign-in, at the release pinned in apply script 50
+t3 service status            # T3 Code's background service, at the version pinned in apply script 70
 ```
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.

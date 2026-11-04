@@ -26,8 +26,8 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 │   ├── modify_dot_bashrc        # additive block in Omarchy's ~/.bashrc
 │   ├── modify_private_dot_claude.json  # onboarding flag in ~/.claude.json (0600)
 │   ├── dot_gitconfig.tmpl
-│   ├── dot_claude/              # modify template for settings.json (0600)
-│   ├── dot_codex/               # modify template for config.toml
+│   ├── dot_claude/              # Claude Code configuration
+│   ├── dot_codex/               # Codex configuration
 │   ├── private_dot_hermes/      # modify templates for config.yaml and .env (0600), SOUL.md link
 │   ├── .chezmoiignore           # skips the SOUL.md link until ~/brain is cloned
 │   ├── dot_config/              # git/, himalaya/, mise/conf.d/, private_op/, systemd/user/ (gateway drop-in)
@@ -38,6 +38,12 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 ├── skills/
 └── tests/
 ```
+
+### Shared writing instructions
+
+The workspace owns `~/brain/policies/writing.md`. Codex's `~/.codex/AGENTS.md` and Claude Code's `~/.claude/CLAUDE.md` link to it. Publish and pull the workspace policy before applying these links to an existing workstation. Inspect both destination files first and preserve any existing instructions before replacing them.
+
+On a fresh install, the links initially have no target and resolve after the installer clones the workspace. They need no second apply. Acceptance checks require the policy to exist. Verify that each CLI loads it in a fresh session before relying on it.
 
 ### Extending files that others also write
 
@@ -53,7 +59,7 @@ Hermes writes `~/.hermes/config.yaml` the same way (its setup wizard, `/model`, 
 
 ### `private_` prefix and directory permissions
 
-Chezmoi's `private_` name prefix sets mode 0700 on a directory (0600 on a file). The prefix applies to the path component it sits on, so place it on the narrowest directory that needs protection. The service-account environment is `private_dot_hermes/private_dot_op.env.tmpl`, which renders `~/.hermes/.op.env` at mode 0600 inside the existing private Hermes directory.
+Chezmoi's `private_` name prefix sets mode 0700 on a directory (0600 on a file). The prefix applies to the path component it sits on, so place it on the narrowest directory that needs protection. `~/.config/op/` holds the service-account token and is `dot_config/private_op/`, which renders 0700 while `~/.config` keeps Omarchy's mode.
 
 When adding a new private subtree, put `private_` on that subtree, not on a shared parent such as `dot_config`.
 
@@ -91,9 +97,9 @@ chezmoi-with-op diff
 chezmoi-with-op cat ~/.gitconfig
 ```
 
-Do not `cat` or `diff` secret-bearing targets such as `~/.hermes/.op.env`, `~/.claude/settings.json`, or `~/.hermes/.env` in logged sessions; their output contains a token.
+Do not `cat` or `diff` secret-bearing targets such as `~/.config/op/env`, `~/.claude/settings.json`, or `~/.hermes/.env` in logged sessions; their output contains a token.
 
-`chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.hermes/.op.env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
+`chezmoi-with-op` is a script at `~/.local/bin/chezmoi-with-op`. It prepends `~/.local/share/mise/shims` and `~/.local/bin` to `PATH` (so the wrapper works from stripped-PATH callers — non-login shells, git hooks, IDE task runners, cron), uses a token the caller supplied for this command or else sources `~/.config/op/env`, execs `chezmoi` with the token in env, and exits cleanly. Restoring a missing env file and rotating the token use the supplied-token form; see [runbooks/1password-service-account.md](../runbooks/1password-service-account.md). The token never touches the parent shell. `with-op` in the same directory does the same for any other command.
 
 If you forget and run bare `chezmoi apply`, you'll see:
 
@@ -180,7 +186,7 @@ Available in `.tmpl` files:
 | `{{ .chezmoi.hostname }}`         | Machine hostname                           |
 | `{{ .chezmoi.username }}`         | Current OS user                            |
 
-The 1Password service account token is NOT a chezmoi data value. It is read from the chezmoi process env at render time via `{{ env "OP_SERVICE_ACCOUNT_TOKEN" }}` in [private_dot_op.env.tmpl](../home/private_dot_hermes/private_dot_op.env.tmpl). See [ARCHITECTURE.md](../ARCHITECTURE.md#secrets-model) for why.
+The 1Password service account token is NOT a chezmoi data value. It is read from the chezmoi process env at render time via `{{ env "OP_SERVICE_ACCOUNT_TOKEN" }}` in [private_env.tmpl](../home/dot_config/private_op/private_env.tmpl). See [ARCHITECTURE.md](../ARCHITECTURE.md#secrets-model) for why.
 
 Inspect available variables:
 
