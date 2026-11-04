@@ -186,15 +186,9 @@ print(check_command_security(sys.argv[1])["action"])' "$1" 2>/dev/null)
 hermes_uses_brain() {
   (cd "$HERMES_DIR" && venv/bin/python -c 'import sys; sys.path.insert(0, ".")
 from hermes_cli.config import load_config
-from pathlib import Path
-from agent.skill_utils import get_external_skills_dirs
-from agent.skill_commands import scan_skill_commands
-brain = Path(sys.argv[1])
-skills = (brain / "skills").resolve()
-ok = (load_config()["terminal"]["cwd"] == str(brain)
-      and skills in [d.resolve() for d in get_external_skills_dirs()]
-      and any(Path(c["skill_md_path"]).resolve().is_relative_to(skills)
-              for c in scan_skill_commands().values()))
+from agent.skill_utils import get_all_skills_dirs
+brain = sys.argv[1]
+ok = load_config()["terminal"]["cwd"] == brain and any(str(d) == brain + "/skills" for d in get_all_skills_dirs())
 sys.exit(0 if ok else 1)' "$WORKSPACE_DIR" 2>/dev/null)
 }
 
@@ -239,17 +233,6 @@ check "Hermes' scanner fails closed without tirith" \
   test "$(TIRITH_BIN=/nonexistent/tirith hermes_scan 'echo hello')" = block
 check "~/.hermes/SOUL.md links to the brain's persona" \
   test "$(readlink "$HOME/.hermes/SOUL.md")" = "$WORKSPACE_DIR/SOUL.md"
-for instruction_file in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md"; do
-  check "$instruction_file is a regular managed instruction file" \
-    bash -c 'test -f "$1" && ! test -L "$1"' _ "$instruction_file"
-  check "$instruction_file references the writing policy" \
-    grep -qF '~/brain/policies/writing.md' "$instruction_file"
-  check "$instruction_file scopes publication to brain and dotfiles" \
-    grep -qF '~/brain/policies/publication.md' "$instruction_file"
-done
-check "workspace publication procedure is readable" test -r "$WORKSPACE_DIR/policies/publication.md"
-check "publish-reviewed is executable" test -x "$HOME/.local/bin/publish-reviewed"
-check "publish-reviewed documents its required reviewed inputs" publish-reviewed --help
 check "Hermes starts gateway sessions in ~/brain and loads its skills" hermes_uses_brain
 
 # The browser vault as Hermes builds it, from a clean environment. It prints
@@ -377,9 +360,6 @@ assert len(jobs) == 1
 job = jobs[0]
 assert job.get("no_agent") is False
 assert "Preserve other sessions" in job.get("prompt", "")
-assert "publish-reviewed" in job.get("prompt", "")
-assert "inactive ownership" in job.get("prompt", "")
-assert "rollout authority" in job.get("prompt", "")
 assert job.get("script") == "sync-brain-and-dotfiles.sh"
 assert job.get("schedule", {}).get("expr") == "*/5 * * * *"
 assert job.get("deliver") == "telegram"

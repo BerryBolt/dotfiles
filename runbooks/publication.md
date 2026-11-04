@@ -42,30 +42,6 @@ On the disposable Omarchy environment, download `install.sh` from the pushed ful
 
 Before a full install that starts services, confirm a separate test delivery identity and destination. Before agent scenarios, also confirm independent Codex CLI and Hermes device sign-ins. Never copy OAuth credentials or run another gateway against the production bot. If those prerequisites are absent, complete independent component checks and report the missing prerequisite. Do not claim full install, repair delivery, or agent acceptance.
 
-## Live acceptance
-
-Use real Git remotes and designated test-owned refs. Never push scenario changes to production default branches. Do not create unit tests, fixture suites, or mocks. Record each command, before/after state, remote commit, result, and cleanup in the ignored local plan. Public summaries omit infrastructure, credentials, private repository links, and private content.
-
-Run every scenario that requires an agent decision in three fresh sessions. Record all three outcomes separately. Three passes are acceptance evidence, not a reliability guarantee. Deterministic checks do not replace these sessions.
-
-| Scenario | Steps and required evidence |
-| --- | --- |
-| Skills, notes, and deletion | Ask Hermes to create a harmless skill through its creation tool, edit a test note, and delete a test-owned file. Inspect returned canonical paths, ignore rules, reviewed hashes, publication proof, a fresh checkout, and a subsequent session loading the skill. |
-| Scoped instruction loading | Start fresh Codex and Claude sessions outside brain and dotfiles, and fresh Hermes sessions. Have each identify the loaded writing and publication instructions and publish an authorized test change in scope. Use another repository to confirm its own workflow remains in force. Retain session evidence and remote commits. |
-| Placement errors | Have each writer identify an ignored or misplaced durable output and correct its canonical output path. Confirm raw content remains ignored. Inspect Hermes' actual create and read paths, including its command and startup skill loader, not just config. |
-| Shared unstaged changes | Leave a test-owned unrelated unstaged edit. Publish only the selected file. Compare the unrelated bytes and Git diff before and after. Reproduce the selected content from a fresh fetch. |
-| Staging and races | Leave another session's staged file and attempt publication. It must block without changing staging. Change a selected file after its review and require a hash block. Use a real concurrent editor or hook race to require a pre-push committed-content block. Verify no unreviewed commit reaches the destination. |
-| Retained commit after push failure | Remove test connectivity after review and commit. Restore it, inspect the retained commit, and have the existing repair job publish with provenance and fresh remote proof. Retain job history and destination state. |
-| Interrupted work | Interrupt a workspace task before and after commit. Verify record lookup connects paths and intent and establishes inactive ownership before takeover. Unattributed content and interrupted setup work must produce an owner-resolution block without publication. Plain CLI records may be missing; verify that block too. |
-| Detector inventory | In real test checkouts, combine dirty files and unpushed commits, then add a secondary worktree, a branch without upstream, and a stash. Compare aggregate diagnostics with local Git inventory. Confirm no secondary publication, apply, or content loss. |
-| Remote advancement and divergence | Advance the destination through a second real checkout. Verify direct ancestry proof accepts a newer descendant. Require clean integration, signed merge, review, and validation after divergence. Complete a designated test PR by squash and verify GitHub's merge result on the default branch. |
-| Apply branch gate | Run the scheduled detector with detached, non-default, and unconfigured setup branches. It must report and defer apply. Verify explicit revision-pinned installer use still selects the exact SHA. |
-| Bounded repair | Observe a transient edit once, then resolve it. No publication repair should wake. Leave an incident for two scheduled observations, then change dirty work into an ahead commit. Require one wake, hourly retries, and no immediate wake on the reason transition. A failed fetch must not clear the incident. Verify clean observation resets it. |
-| Settings and recovery | Change a harmless rendered setting, require post-task verification to detect it, then capture the intended source and apply. Verify convergence without credentials or runtime data entering Git. Run existing assertions and recovery at the exact pushed SHA. |
-| Reapply and restart | Save job identity, schedule, paused state, and history, reapply twice, restart the isolated gateway, and confirm one job retains them. Verify fresh sessions load current rules and a fresh checkout contains the durable content. |
-
-The implementing operator removes test-owned files, refs, stashes, and secondary worktrees after recording evidence. Preserve failures and unfinished work until their ownership is resolved. Do not delete repositories or reset shared checkouts as cleanup.
-
 ## Rollback
 
 Keep failed candidates off `main`. After rollout, revert faulty source with a new commit, then verify apply. Preserve the existing job and durable files. Do not restore old runtime databases or reset workspaces.
