@@ -706,6 +706,15 @@ bootstrap_main() {
   mkdir -p -m 700 "$sync_state"
   exec 9>"$sync_state/run.lock"
   flock 9
+  # Coordinate existing source updates with compliant publishers as well.
+  # Keep this descriptor out of child processes and services.
+  if [ -d "$SOURCE_DIR/.git" ]; then
+    publication_common="$(git -C "$SOURCE_DIR" rev-parse --path-format=absolute --git-common-dir)"
+    exec 8>"$publication_common/publication.lock"
+    flock 8
+  else
+    exec 8>/dev/null
+  fi
   {
     install_bootstrap_tools
     verify_credentials
@@ -719,7 +728,8 @@ bootstrap_main() {
 
     clone_workspace
     apply_workspace_links
-  } 9>&-
+  } 8>&- 9>&-
+  exec 8>&-
   flock -u 9
   exec 9>&-
   sign_in_codex

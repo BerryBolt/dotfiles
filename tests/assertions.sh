@@ -234,10 +234,16 @@ check "Hermes' scanner fails closed without tirith" \
 check "~/.hermes/SOUL.md links to the brain's persona" \
   test "$(readlink "$HOME/.hermes/SOUL.md")" = "$WORKSPACE_DIR/SOUL.md"
 for instruction_file in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md"; do
-  check "$instruction_file links to the workspace writing policy" \
-    test "$(readlink "$instruction_file")" = "$WORKSPACE_DIR/policies/writing.md"
-  check "$instruction_file has a readable policy target" test -r "$instruction_file"
+  check "$instruction_file is a regular managed instruction file" \
+    bash -c 'test -f "$1" && ! test -L "$1"' _ "$instruction_file"
+  check "$instruction_file references the writing policy" \
+    grep -qF '~/brain/policies/writing.md' "$instruction_file"
+  check "$instruction_file scopes publication to brain and dotfiles" \
+    grep -qF '~/brain/policies/publication.md' "$instruction_file"
 done
+check "workspace publication procedure is readable" test -r "$WORKSPACE_DIR/policies/publication.md"
+check "publish-reviewed is executable" test -x "$HOME/.local/bin/publish-reviewed"
+check "publish-reviewed documents its required reviewed inputs" publish-reviewed --help
 check "Hermes starts gateway sessions in ~/brain and loads its skills" hermes_uses_brain
 
 # The browser vault as Hermes builds it, from a clean environment. It prints
@@ -365,6 +371,9 @@ assert len(jobs) == 1
 job = jobs[0]
 assert job.get("no_agent") is False
 assert "Preserve other sessions" in job.get("prompt", "")
+assert "publish-reviewed" in job.get("prompt", "")
+assert "inactive ownership" in job.get("prompt", "")
+assert "rollout authority" in job.get("prompt", "")
 assert job.get("script") == "sync-brain-and-dotfiles.sh"
 assert job.get("schedule", {}).get("expr") == "*/5 * * * *"
 assert job.get("deliver") == "telegram"

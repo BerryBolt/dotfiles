@@ -39,11 +39,13 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 └── tests/
 ```
 
-### Shared writing instructions
+### Shared global instructions
 
-The workspace owns `~/brain/policies/writing.md`. Codex's `~/.codex/AGENTS.md` and Claude Code's `~/.claude/CLAUDE.md` link to it. Publish and pull the workspace policy before applying these links to an existing workstation. Inspect both destination files first and preserve any existing instructions before replacing them.
+The workspace owns `~/brain/policies/writing.md` and `~/brain/policies/publication.md`. The managed Codex `~/.codex/AGENTS.md` and Claude Code `~/.claude/CLAUDE.md` reference both. Publication instructions apply only to brain and the active dotfiles source. Other repositories keep their own workflow.
 
-On a fresh install, the links initially have no target and resolve after the installer clones the workspace. They need no second apply. Acceptance checks require the policy to exist. Verify that each CLI loads it in a fresh session before relying on it.
+Publish workspace prerequisites to a candidate first. Verify them with the setup candidate on the disposable environment before rollout. The modify template replaces the old writing-only policy content when it matches exactly and otherwise preserves unrelated instructions around one managed block. Inspect both destinations and symlink targets before migration. The result is a regular file, so it cannot modify the workspace policy through the old link.
+
+Missing workspace policies block agent completion but do not block configuration apply. This preserves apply's independence from the workspace. File presence proves installation only. Verify actual instruction loading in fresh Codex, Claude, and Hermes sessions, including CLI sessions rooted elsewhere.
 
 ### Extending files that others also write
 

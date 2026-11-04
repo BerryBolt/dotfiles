@@ -74,7 +74,7 @@ op whoami                    # service account; the token stays in op's subshell
 with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
 chezmoi-with-op apply        # reapply managed files and SSH restoration
 ssh -T git@github.com        # authenticates with the restored key
-git -C ~/brain pull          # the workspace checkout, cloned by the installer
+sync-brain-and-dotfiles      # inspect and fast-forward clean tracking checkouts
 git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
@@ -108,7 +108,9 @@ Acceptance testing installs a pushed candidate from the public GitHub repository
 
 ## Repository synchronization
 
-Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
+Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. The detector fetches dirty checkouts, inventories unpublished work, and bounds publication repair by repository. Setup apply requires the remote default branch. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
+
+Publish completed brain and setup work through the workspace procedure and `publish-reviewed`. It preserves unrelated unstaged work, refuses existing staging, verifies reviewed whole-file content before push, and fetches again for remote proof. See [helper inputs and candidate acceptance](runbooks/publication.md). Candidate runtime acceptance and agent trials are recorded separately from local code checks.
 
 ## License
 
