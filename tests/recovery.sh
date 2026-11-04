@@ -128,7 +128,7 @@ retry_installer() {
   curl -fsSL "https://raw.githubusercontent.com/BerryBolt/dotfiles/$sha/install.sh" |
     env -u CHEZMOI_AGENT_NAME -u CHEZMOI_AGENT_EMAIL -u CHEZMOI_AGENT_HANDLE_GITHUB \
       -u CHEZMOI_AGENT_WORKSPACE_REPO -u CHEZMOI_OP_VAULT -u CHEZMOI_OP_SSH_ITEM \
-      -u CHEZMOI_OP_ACCOUNT_ITEM -u OP_SERVICE_ACCOUNT_TOKEN \
+      -u CHEZMOI_OP_ACCOUNT_ITEM -u CHEZMOI_OP_TELEGRAM_ITEM -u OP_SERVICE_ACCOUNT_TOKEN \
       bash -s -- --non-interactive --revision "$sha"
 }
 check "installer retry recovers every input without environment overrides" retry_installer

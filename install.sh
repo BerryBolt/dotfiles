@@ -34,6 +34,7 @@ Env overrides:
   CHEZMOI_OP_SSH_ITEM=...   # SSH Key item title or ID in that vault
   CHEZMOI_OP_ACCOUNT_ITEM=...  # Server item title or ID with this account's
                                # username and password (for sudo)
+  CHEZMOI_OP_TELEGRAM_ITEM=...  # Telegram item title or ID; default: Telegram Bot - API key
   OP_SERVICE_ACCOUNT_TOKEN=...
 
 Optional:
@@ -265,6 +266,7 @@ review_and_edit() {
     echo "    1Password vault: $OP_VAULT"
     echo "    1Password SSH key item: $OP_SSH_ITEM"
     echo "    1Password workstation account item: $OP_ACCOUNT_ITEM"
+    echo "    1Password Telegram bot item: $OP_TELEGRAM_ITEM"
     if ! is_blank "$OP_SERVICE_ACCOUNT_TOKEN"; then
       tail=$(mask_token "$OP_SERVICE_ACCOUNT_TOKEN")
       echo "    Token: set ($tail)"
@@ -282,7 +284,8 @@ review_and_edit() {
     echo "    7) Edit 1Password SSH key item"
     echo "    8) Edit 1Password workstation account item"
     echo "    9) Edit token"
-    printf "    Enter choice [1-9]: "
+    echo "    10) Edit Telegram bot item"
+    printf "    Enter choice [1-10]: "
     read -r selection < "$TTY_DEV" || abort
     case "$selection" in
       1|"")
@@ -326,6 +329,10 @@ review_and_edit() {
         prompt_secret "1Password service account token" "$OP_SERVICE_ACCOUNT_TOKEN"
         OP_SERVICE_ACCOUNT_TOKEN=$PROMPT_VALUE
         ;;
+      10)
+        prompt_string "1Password Telegram bot item (title or ID)" "Telegram Bot - API key" "$OP_TELEGRAM_ITEM"
+        OP_TELEGRAM_ITEM=$PROMPT_VALUE
+        ;;
       *)
         log_info "Invalid choice. Try again."
         ;;
@@ -354,7 +361,7 @@ load_saved_inputs() {
   if [ -f "$config_file" ]; then
     for binding in AGENT_NAME:agent_name AGENT_EMAIL:agent_email \
       AGENT_HANDLE_GITHUB:agent_handle_github OP_VAULT:op_vault \
-      OP_SSH_ITEM:op_ssh_item OP_ACCOUNT_ITEM:op_account_item; do
+      OP_SSH_ITEM:op_ssh_item OP_ACCOUNT_ITEM:op_account_item OP_TELEGRAM_ITEM:op_telegram_item; do
       input=${binding%%:*}
       key=${binding#*:}
       if is_blank "${!input}"; then
@@ -395,8 +402,12 @@ collect_inputs() {
   OP_VAULT="${CHEZMOI_OP_VAULT:-}"
   OP_SSH_ITEM="${CHEZMOI_OP_SSH_ITEM:-}"
   OP_ACCOUNT_ITEM="${CHEZMOI_OP_ACCOUNT_ITEM:-}"
+  OP_TELEGRAM_ITEM="${CHEZMOI_OP_TELEGRAM_ITEM:-}"
   OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
   load_saved_inputs
+  if is_blank "$OP_TELEGRAM_ITEM"; then
+    OP_TELEGRAM_ITEM="Telegram Bot - API key"
+  fi
   OP_SERVICE_ACCOUNT_TOKEN=$(trim_space "${OP_SERVICE_ACCOUNT_TOKEN:-}")
   case "$OP_SERVICE_ACCOUNT_TOKEN" in
     ops_*|"") ;;
@@ -696,6 +707,7 @@ bootstrap_main() {
   export CHEZMOI_OP_VAULT="$OP_VAULT"
   export CHEZMOI_OP_SSH_ITEM="$OP_SSH_ITEM"
   export CHEZMOI_OP_ACCOUNT_ITEM="$OP_ACCOUNT_ITEM"
+  export CHEZMOI_OP_TELEGRAM_ITEM="$OP_TELEGRAM_ITEM"
   export OP_SERVICE_ACCOUNT_TOKEN
 
   # Hold the sync lock across source changes, apply, and workspace creation.
