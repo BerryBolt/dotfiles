@@ -8,7 +8,7 @@
 {{-   fail "~/.hermes/.env is missing; Hermes' installer (apply script 50) seeds it" -}}
 {{- end -}}
 {{- $env := .chezmoi.stdin -}}
-{{- $telegram := printf "op://%s/Telegram Bot - API key" .op_vault -}}
+{{- $telegram := printf "op://%s/%s" .op_vault (get . "op_telegram_item" | default "Telegram Bot - API key") -}}
 {{- $owner := onepasswordRead (printf "%s/owner user ID" $telegram) -}}
 {{- $declared := dict -}}
 {{- /* The bot, and the owner as its only user and the home chat for deliveries. */ -}}
