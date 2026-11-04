@@ -106,6 +106,10 @@ Omarchy remains responsible for its desktop, shell defaults, and existing tools.
 
 Acceptance testing installs a pushed candidate from the public GitHub repository on a disposable Omarchy VM. Supply `OP_SERVICE_ACCOUNT_TOKEN` through ignored local configuration and use [tests/.env.local.example](tests/.env.local.example) for the remaining input names. Actual tokens, vault/account values, VM addresses, logins, and private platform records are local operational inputs.
 
+## Repository synchronization
+
+Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
+
 ## License
 
 MIT

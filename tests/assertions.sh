@@ -335,6 +335,25 @@ check "~/brain is a checkout of $CHEZMOI_AGENT_WORKSPACE_REPO over SSH" \
 check "~/brain reaches its origin over SSH (ls-remote origin)" \
   env GIT_SSH_COMMAND="ssh -o BatchMode=yes" git -C "$WORKSPACE_DIR" ls-remote --exit-code origin HEAD
 
+echo "Repository synchronization"
+check "sync-brain-and-dotfiles is executable" test -x "$HOME/.local/bin/sync-brain-and-dotfiles"
+check "Hermes has one gated sync repair job" bash -c '
+  cd "$HOME/.hermes/hermes-agent" || exit 1
+  venv/bin/python - <<"PYTHON"
+from cron.jobs import list_jobs
+jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "sync-brain-and-dotfiles"]
+assert len(jobs) == 1
+job = jobs[0]
+assert job.get("no_agent") is False
+assert "Preserve other sessions" in job.get("prompt", "")
+assert job.get("script") == "sync-brain-and-dotfiles.sh"
+assert job.get("schedule", {}).get("expr") == "*/5 * * * *"
+assert job.get("deliver") == "telegram"
+from pathlib import Path
+assert job.get("workdir") == str(Path.home() / "brain")
+PYTHON
+'
+
 echo ""
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Fast-forward the workstation repositories and retry unapplied setup changes."""
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+
+class Deferred(RuntimeError):
+    pass
+
+
+def run(*args):
+    result = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True, timeout=1800)
+    if result.returncode:
+        operation = args[0] + (" " + args[3] if args[0] == "git" else "")
+        raise RuntimeError(operation + " exited " + str(result.returncode))
+    return result.stdout.strip()
+
+
+def sync(repo, apply=False):
+    def git(*args):
+        return run("git", "-C", str(repo), *args)
+
+    if not repo.is_dir():
+        raise RuntimeError("checkout missing")
+    try:
+        original_branch = git("symbolic-ref", "--quiet", "HEAD")
+    except RuntimeError:
+        raise Deferred("checkout detached")
+    if git("status", "--porcelain", "--untracked-files=all"):
+        raise Deferred("checkout dirty")
+    branch = git("symbolic-ref", "--short", "HEAD")
+    remote = git("config", "--get", "branch." + branch + ".remote")
+    git("fetch", "--quiet", remote)
+    if git("symbolic-ref", "--quiet", "HEAD") != original_branch:
+        raise Deferred("branch changed during fetch")
+    if git("status", "--porcelain", "--untracked-files=all"):
+        raise Deferred("checkout changed during fetch")
+    ahead, _ = map(int, git("rev-list", "--left-right", "--count", "HEAD...@{upstream}").split())
+    if ahead:
+        raise Deferred("checkout ahead or diverged")
+    git("merge", "--ff-only", "--quiet", "@{upstream}")
+    sha = git("rev-parse", "HEAD")
+    if apply:
+        marker = state / "applied-sha"
+        if not marker.exists() or marker.read_text().strip() != sha:
+            attempt = state / "apply-attempt"
+            if scheduled and attempt.exists():
+                last_sha, last_time = attempt.read_text().split()
+                if last_sha == sha and time.time() - float(last_time) < 3600:
+                    raise Deferred("apply retry deferred for up to one hour")
+            pending = state / "apply-attempt.tmp"
+            pending.write_text(sha + " " + str(time.time()) + "\n")
+            pending.replace(attempt)
+            # EOF rejects conflicts on targets already recorded by chezmoi.
+            run("chezmoi-with-op", "--no-tty", "--force=false", "apply")
+            if git("rev-parse", "HEAD") != sha or git("status", "--porcelain"):
+                raise RuntimeError("source changed during apply")
+            temp = state / "applied-sha.tmp"
+            temp.write_text(sha + "\n")
+            temp.replace(marker)
+    if not scheduled:
+        print("sync-brain-and-dotfiles: " + ("dotfiles" if apply else "brain") + " complete")
+
+
+def main():
+    global state, scheduled
+    if sys.argv[1:] not in ([], ["--scheduled"]):
+        print("usage: sync-brain-and-dotfiles [--scheduled]", file=sys.stderr)
+        return 2
+    scheduled = sys.argv[1:] == ["--scheduled"]
+    os.environ["PATH"] = str(Path.home() / ".local/bin") + ":" + str(Path.home() / ".local/share/mise/shims") + ":" + os.environ.get("PATH", "/usr/bin:/bin")
+    os.environ["GIT_TERMINAL_PROMPT"] = "0"
+    os.environ["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes -o ConnectTimeout=20"
+    state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "sync-brain-and-dotfiles"
+    state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with (state / "run.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            if scheduled:
+                print(json.dumps({"wakeAgent": False, "status": "sync already active"}))
+            else:
+                print("sync-brain-and-dotfiles: another run is active", file=sys.stderr)
+            return 0 if scheduled else 1
+        issues = []
+        # Resolve each checkout separately so one failure never blocks the other.
+        for name in ("brain", "dotfiles"):
+            try:
+                repo = Path.home() / "brain" if name == "brain" else Path(run("chezmoi", "source-path"))
+                repo = Path(run("git", "-C", str(repo), "rev-parse", "--show-toplevel"))
+                sync(repo, apply=name == "dotfiles")
+            except RuntimeError as error:
+                issues.append({"repo": name, "reason": str(error)})
+            except Exception:
+                # Exception text can contain command output, paths, or credentials.
+                issues.append({"repo": name, "reason": "unexpected sync failure; inspect locally"})
+        if scheduled:
+            notice = state / "repair-notice.json"
+            wake = bool(issues)
+            if issues:
+                # A pending retry is the same incident as its failed apply.
+                normalized = [dict(issue, reason="apply incomplete")
+                              if issue["reason"].startswith(("apply retry deferred", "chezmoi-with-op exited"))
+                              else issue for issue in issues]
+                fingerprint = hashlib.sha256(json.dumps(
+                    sorted(normalized, key=lambda issue: (issue["repo"], issue["reason"])),
+                    sort_keys=True).encode()).hexdigest()
+                previous = {}
+                try:
+                    previous = json.loads(notice.read_text())
+                    if not isinstance(previous, dict):
+                        previous = {}
+                    wake = (previous.get("fingerprint") != fingerprint
+                            or time.time() - float(previous.get("time", 0)) >= 3600)
+                except (OSError, ValueError, TypeError):
+                    pass
+                if wake:
+                    pending = state / "repair-notice.tmp"
+                    pending.write_text(json.dumps({"fingerprint": fingerprint, "time": time.time()}))
+                    pending.replace(notice)
+            else:
+                notice.unlink(missing_ok=True)
+            print(json.dumps({"wakeAgent": wake, "issues": issues}))
+            return 0
+        for issue in issues:
+            print("sync-brain-and-dotfiles: " + issue["repo"] + ": " + issue["reason"], file=sys.stderr)
+        return int(bool(issues))
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        if sys.argv[1:] == ["--scheduled"]:
+            print(json.dumps({"wakeAgent": True, "issues": [
+                {"repo": "sync", "reason": "unexpected setup failure; inspect locally"}]}))
+            sys.exit(0)
+        print("sync-brain-and-dotfiles: unexpected setup failure; inspect locally", file=sys.stderr)
+        sys.exit(1)

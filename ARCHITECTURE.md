@@ -18,7 +18,7 @@ Omarchy is the sole deployment target. The setup builds on Omarchy's defaults: i
 
 ### Implemented so far
 
-The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the Hermes agent harness at a pinned release with its model, tool, and Telegram settings and its gateway service, T3 Code at a pinned version with its background service, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; other services; scheduled work and its safe resumption; and further integrations belong to this repository but are not implemented yet.
+The current increment covers the workstation fundamentals: prerequisite checks, chezmoi, scoped 1Password access, Bash integration, Git identity and signing, SSH key restore and GitHub host trust, passwordless sudo for the agent account, system packages (Brave as the default browser), mail through `himalaya`, the Codex and Claude Code CLIs with their settings, the Hermes agent harness at a pinned release with its model, tool, and Telegram settings and its gateway service, T3 Code at a pinned version with its background service, the workspace checkout, revision-pinned installs, and the recovery paths below. Desktop, terminal, and theme settings; other services; other scheduled work and its safe resumption; and further integrations belong to this repository but are not implemented yet.
 
 ## Chezmoi source model
 
@@ -26,13 +26,13 @@ The current increment covers the workstation fundamentals: prerequisite checks, 
 - The default checkout is `~/.local/share/chezmoi`; user configuration is rendered into the home directory.
 - Policies, runbooks, skills, and tests stay in the source repository and are not applied.
 - Account name, email, GitHub handle, vault name, and the item selectors for the SSH key (`op_ssh_item`) and the workstation account (`op_account_item`), each a title or item ID, are chezmoi data. The service-account token is never persisted in chezmoi data or committed source. The workspace repository is an installer input only; apply never reads it.
-- Source updates and target applies are separate operations. Review source changes, then apply them with the required credential context.
+- Source updates and target applies are separate operations. The repository sync job fast-forwards clean checkouts and applies dotfiles with the required credential context. Inspect new managed destinations before publishing changes.
 
 Use chezmoi commands for managed-file changes per [policies/chezmoi.md](policies/chezmoi.md). Isolate development rendering and testing from the operator's real home directory.
 
 ## Bootstrap flow
 
-1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything. The installer itself never installs system packages; apply script 40 does, once sudo is passwordless, and Omarchy's update (step 8) upgrades them.
+1. **Preflight.** `install.sh` requires Omarchy (`ID=omarchy` in `/etc/os-release`), a non-root user, `git`, `ssh`, `ssh-keygen`, `mise`, `flock`, `python3`, and an existing `~/.bashrc`. Omarchy supplies all of them. A missing prerequisite stops the installer before it changes anything. The installer itself never installs system packages; apply script 40 does, once sudo is passwordless, and Omarchy's update (step 8) upgrades them.
 2. **Inputs.** It collects the account name, email, GitHub handle, workspace repository (`owner/name`), vault, SSH key item, workstation account item, and service-account token. Environment overrides take precedence. On a rerun it reads missing identity, vault, and item selectors from `~/.config/chezmoi/chezmoi.toml` (under `XDG_CONFIG_HOME` when set), using chezmoi's TOML parser without rendering source templates; the token from `~/.config/op/env` in a child process; and the workspace selector from `~/brain`'s GitHub SSH origin. It prompts only for values still missing, then offers review and edits. `--non-interactive` requires all inputs to be supplied or recovered, and fails with the missing variable names otherwise. Unreadable or malformed saved configuration and unsupported workspace origins stop with an actionable error. The token never enters the invoking shell's environment.
 3. **Bootstrap tools.** It installs `chezmoi` and the 1Password CLI (the tools the first render needs) with mise in user space, then verifies that the token belongs to a service account, the vault is accessible, the SSH key item is readable, and the workstation account item names the installing account. While sudo still asks for a password, it also checks the item's password against sudo. Bad credentials fail here, before any configuration is written.
 4. **Source.** On first install it clones `https://github.com/<handle>/dotfiles.git` over HTTPS. On later runs it requires the SSH remote configured by the first apply, refuses a source with local modifications, and fast-forwards over SSH. It never falls back to HTTPS. With `--revision <full-sha>` it detaches the source at exactly that commit instead, fetching it from `origin` when needed, and fails if the commit cannot be obtained. The installer logs the applied commit.
@@ -113,7 +113,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Safe resumption
 
-A new workstation's Hermes gateway starts live: it takes Telegram turns as soon as it connects. The workstation runs no scheduled work yet, so nothing can repeat work done before a restore.
+A new workstation's Hermes gateway starts live: it takes Telegram turns as soon as it connects. Apply registers a gated repository synchronization and repair job every five minutes. It only fast-forwards clean tracking branches and applies dotfiles without forcing target conflicts. See [repository synchronization](runbooks/sync-brain-and-dotfiles.md) for retries and recovery limits.
 
 ## Validation
 
