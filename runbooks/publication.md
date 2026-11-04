@@ -40,7 +40,7 @@ Merging setup to `main` authorizes automatic rollout through the existing five-m
 
 On the disposable Omarchy environment, download `install.sh` from the pushed full setup SHA and pass that same SHA to `--revision`. Fetch and select the pushed workspace candidate explicitly. Record both SHAs. Do not install an uncommitted tree. Preserve test access and the Omarchy baseline. Reset only the authorized disposable setup between fresh-install attempts.
 
-Before any agent scenario or full install that starts services, confirm a separate test delivery identity and destination and independent Codex CLI and Hermes device sign-ins. Never copy OAuth credentials or run another gateway against the production bot. If those prerequisites are absent, complete independent component checks and report the missing prerequisite. Do not claim full install, repair delivery, or agent acceptance.
+Before a full install that starts services, confirm a separate test delivery identity and destination. Before agent scenarios, also confirm independent Codex CLI and Hermes device sign-ins. Never copy OAuth credentials or run another gateway against the production bot. If those prerequisites are absent, complete independent component checks and report the missing prerequisite. Do not claim full install, repair delivery, or agent acceptance.
 
 ## Live acceptance
 
