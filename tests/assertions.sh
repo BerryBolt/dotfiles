@@ -339,7 +339,7 @@ echo "Repository synchronization"
 check "sync-brain-and-dotfiles is executable" test -x "$HOME/.local/bin/sync-brain-and-dotfiles"
 check "Hermes has one gated sync repair job" bash -c '
   cd "$HOME/.hermes/hermes-agent" || exit 1
-  .venv/bin/python - <<"PYTHON"
+  venv/bin/python - <<"PYTHON"
 from cron.jobs import list_jobs
 jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "sync-brain-and-dotfiles"]
 assert len(jobs) == 1
