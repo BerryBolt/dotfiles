@@ -48,7 +48,7 @@ Apply starts two services, the Hermes gateway and T3 Code, and configures no int
 | Target | Source | Behavior |
 | --- | --- | --- |
 | `~/.bashrc` | `home/modify_dot_bashrc` | Keeps Omarchy's file byte-for-byte and maintains one marked block that defines `op()` as `with-op op`. Fails if the file is missing or the block markers are damaged. |
-| `~/.local/bin/with-op` | `home/dot_local/bin/executable_with-op` | Runs one command with `~/.config/op/env` loaded into that process only. |
+| `~/.local/bin/with-op` | `home/dot_local/bin/executable_with-op` | Runs one command with `~/.config/op/env` loaded into that process only. Hermes' browser vault uses it as its `op` binary. |
 | `~/.local/bin/chezmoi-with-op` | `home/dot_local/bin/executable_chezmoi-with-op` | Runs chezmoi with the token for template rendering: a token supplied in the caller's environment wins, otherwise `~/.config/op/env`; with neither it fails. |
 | `~/.config/op/env` | `home/dot_config/private_op/private_env.tmpl` | Token, vault, and `OP_FORMAT=json`; mode 0600 in a 0700 directory. `~/.config` keeps Omarchy's mode. |
 | `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares the tools Omarchy does not provide: `chezmoi`, `1password-cli`, `wrangler` (npm backend, on Omarchy's Node), and `tirith`, the scanner Hermes runs on every command. `~/.config/mise/config.toml` stays user-owned. Tools Omarchy provides, such as `gh`, come from its on-demand launchers. |
