@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import tomllib
 
 
 def run(*args):
@@ -15,6 +16,15 @@ def run(*args):
     if result.returncode:
         raise RuntimeError(args[0] + ' operation failed; inspect locally')
     return result.stdout.rstrip('\n')
+
+
+def configured_dotfiles_branch():
+    config = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'chezmoi/chezmoi.toml'
+    with config.open('rb') as stream:
+        branch = tomllib.load(stream).get('data', {}).get('dotfiles_branch', 'main')
+    if not isinstance(branch, str) or not branch or run('git', 'check-ref-format', '--branch', branch) != branch:
+        raise ValueError('invalid dotfiles_branch')
+    return branch
 
 
 def observe(repo, apply=False):
@@ -26,6 +36,12 @@ def observe(repo, apply=False):
         return run('git', '-C', str(repo), *args)
     complete = False
     try:
+        if apply:
+            try:
+                setup_branch = configured_dotfiles_branch()
+            except Exception:
+                issue('observation', 'cannot read dotfiles_branch; repair chezmoi.toml data, default main')
+                return issues, counts, False
         common = Path(git('rev-parse', '--path-format=absolute', '--git-common-dir'))
         with (common / 'publication.lock').open('a') as lock:
             try:
@@ -69,6 +85,8 @@ def observe(repo, apply=False):
             refs = git('for-each-ref', '--format=%(refname)%09%(upstream)%09%(upstream:remotename)%09%(upstream:remoteref)', 'refs/heads/').splitlines()
             remotes = {line.split('\t')[2] for line in refs if len(line.split('\t')) >= 3}
             remotes -= {'', '.'}
+            if apply:
+                remotes.add('origin')
             failed_remotes = set()
             for remote_name in sorted(remotes):
                 try:
@@ -113,16 +131,12 @@ def observe(repo, apply=False):
             if remote in failed_remotes:
                 issue('observation', 'checkout upstream fetch failed; integration and setup apply deferred')
             elif apply and branch and remote and remote != '.':
-                default_lines = git('ls-remote', '--symref', remote, 'HEAD').splitlines()
-                defaults = [line.split()[1] for line in default_lines if line.startswith('ref: ')]
-                if len(defaults) != 1:
-                    issue('publication', 'remote default branch is ambiguous')
-                elif 'refs/heads/' + branch != defaults[0] or destination != defaults[0]:
-                    issue('publication', 'setup apply requires the remote default branch')
+                if branch != setup_branch or remote != 'origin' or destination != 'refs/heads/' + setup_branch:
+                    issue('publication', 'setup apply requires the configured dotfiles_branch and its origin upstream')
                 else:
                     setup_branch_allowed = True
             complete = not failed_remotes
-            # Never integrate a dirty, detached, ahead, or non-default setup checkout.
+            # Never integrate a dirty, detached, ahead, or unselected setup checkout.
             blocked = bool(counts['modified'] or counts['untracked'] or not branch
                            or not remote or remote == '.' or remote in failed_remotes
                            or ahead is None or ahead or not setup_branch_allowed)

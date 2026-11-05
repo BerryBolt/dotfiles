@@ -35,13 +35,14 @@ Env overrides:
   CHEZMOI_OP_ACCOUNT_ITEM=...  # Server item title or ID with this account's
                                # username and password (for sudo)
   CHEZMOI_OP_TELEGRAM_ITEM=...  # Telegram item title or ID; default: Telegram Bot - API key
+  CHEZMOI_DOTFILES_BRANCH=...  # tracking branch; saved on this machine; default: main
   OP_SERVICE_ACCOUNT_TOKEN=...
 
 Optional:
   CHEZMOI_NONINTERACTIVE=1  # disable prompts (requires all inputs)
   --non-interactive         # same as above
   --revision <sha>          # apply this full 40-character commit SHA of the
-  DOTFILES_REVISION=<sha>   # source instead of the default branch; use the
+  DOTFILES_REVISION=<sha>   # source instead of the selected branch; use the
                             # same SHA as the installer URL when testing
 
 The source repository is https://github.com/<GitHub handle>/dotfiles.git.
@@ -262,6 +263,7 @@ review_and_edit() {
     echo "    Agent name: $AGENT_NAME"
     echo "    Agent email: $AGENT_EMAIL"
     echo "    GitHub handle: $AGENT_HANDLE_GITHUB"
+    echo "    Dotfiles branch: $DOTFILES_BRANCH"
     echo "    Workspace repository: $WORKSPACE_REPO"
     echo "    1Password vault: $OP_VAULT"
     echo "    1Password SSH key item: $OP_SSH_ITEM"
@@ -361,7 +363,8 @@ load_saved_inputs() {
   if [ -f "$config_file" ]; then
     for binding in AGENT_NAME:agent_name AGENT_EMAIL:agent_email \
       AGENT_HANDLE_GITHUB:agent_handle_github OP_VAULT:op_vault \
-      OP_SSH_ITEM:op_ssh_item OP_ACCOUNT_ITEM:op_account_item OP_TELEGRAM_ITEM:op_telegram_item; do
+      OP_SSH_ITEM:op_ssh_item OP_ACCOUNT_ITEM:op_account_item OP_TELEGRAM_ITEM:op_telegram_item \
+      DOTFILES_BRANCH:dotfiles_branch; do
       input=${binding%%:*}
       key=${binding#*:}
       if is_blank "${!input}"; then
@@ -403,8 +406,10 @@ collect_inputs() {
   OP_SSH_ITEM="${CHEZMOI_OP_SSH_ITEM:-}"
   OP_ACCOUNT_ITEM="${CHEZMOI_OP_ACCOUNT_ITEM:-}"
   OP_TELEGRAM_ITEM="${CHEZMOI_OP_TELEGRAM_ITEM:-}"
+  DOTFILES_BRANCH="${CHEZMOI_DOTFILES_BRANCH:-}"
   OP_SERVICE_ACCOUNT_TOKEN="${OP_SERVICE_ACCOUNT_TOKEN:-}"
   load_saved_inputs
+  DOTFILES_BRANCH="${DOTFILES_BRANCH:-main}"
   if is_blank "$OP_TELEGRAM_ITEM"; then
     OP_TELEGRAM_ITEM="Telegram Bot - API key"
   fi
@@ -545,6 +550,37 @@ checkout_revision() {
   fi
 }
 
+# Select only a published tracking branch. Never move detached or unpublished work.
+checkout_branch() {
+  local current upstream target="refs/remotes/origin/$DOTFILES_BRANCH"
+  current=$(git -C "$SOURCE_DIR" branch --show-current)
+  [ -n "$current" ] || log_error "$SOURCE_DIR is detached. Select the intended tracking branch explicitly before rerunning without --revision."
+  if ! git -C "$SOURCE_DIR" fetch --quiet --prune origin ||
+    ! git -C "$SOURCE_DIR" fetch --quiet origin "+refs/heads/$DOTFILES_BRANCH:$target"; then
+    log_error "Cannot fetch dotfiles branch $DOTFILES_BRANCH from origin. Check that it exists and SSH access works."
+  fi
+  upstream=$(git -C "$SOURCE_DIR" for-each-ref --format='%(upstream)' "refs/heads/$current")
+  if [ "$upstream" != "refs/remotes/origin/$current" ] ||
+    ! git -C "$SOURCE_DIR" merge-base --is-ancestor HEAD "$upstream"; then
+    log_error "Current branch $current must track origin/$current with no unpublished commits before installer source selection. Preserve and publish its work first."
+  fi
+  if [ "$current" != "$DOTFILES_BRANCH" ]; then
+    if git -C "$SOURCE_DIR" show-ref --verify --quiet "refs/heads/$DOTFILES_BRANCH"; then
+      upstream=$(git -C "$SOURCE_DIR" for-each-ref --format='%(upstream)' "refs/heads/$DOTFILES_BRANCH")
+      if [ "$upstream" != "$target" ] ||
+        ! git -C "$SOURCE_DIR" merge-base --is-ancestor "refs/heads/$DOTFILES_BRANCH" "$target"; then
+        log_error "Selected branch $DOTFILES_BRANCH must track origin/$DOTFILES_BRANCH with no unpublished commits. Resolve it before rerunning."
+      fi
+      git -C "$SOURCE_DIR" switch --quiet "$DOTFILES_BRANCH" || log_error "Cannot select branch $DOTFILES_BRANCH. Inspect local worktrees."
+    else
+      git -C "$SOURCE_DIR" switch --quiet --create "$DOTFILES_BRANCH" --track "origin/$DOTFILES_BRANCH" ||
+        log_error "Cannot create tracking branch $DOTFILES_BRANCH."
+    fi
+  fi
+  git -C "$SOURCE_DIR" -c merge.autostash=false merge --ff-only --quiet "$target" ||
+    log_error "Cannot fast-forward dotfiles branch $DOTFILES_BRANCH. Resolve the source checkout before rerunning."
+}
+
 # Clone the public source on first install. Afterwards, sync over the SSH
 # remote that the apply script configured; never fall back to HTTPS.
 sync_source() {
@@ -553,11 +589,17 @@ sync_source() {
   if [ ! -e "$SOURCE_DIR" ]; then
     log_info "Cloning dotfiles source from $repo..."
     mkdir -p "$(dirname "$SOURCE_DIR")"
-    if ! git clone --quiet "$repo" "$SOURCE_DIR"; then
+    local clone_options=()
+    if [ -z "$REVISION" ]; then
+      clone_options=(--branch "$DOTFILES_BRANCH")
+    fi
+    if ! git clone --quiet "${clone_options[@]}" "$repo" "$SOURCE_DIR"; then
       log_error "Failed to clone dotfiles source: $repo"
     fi
     if [ -n "$REVISION" ]; then
       checkout_revision
+    elif [ "$(git -C "$SOURCE_DIR" branch --show-current)" != "$DOTFILES_BRANCH" ]; then
+      log_error "origin must contain branch $DOTFILES_BRANCH. A tag with that name cannot be used for tracking."
     fi
     return
   fi
@@ -590,13 +632,8 @@ sync_source() {
     return
   fi
 
-  if ! git -C "$SOURCE_DIR" symbolic-ref -q HEAD >/dev/null; then
-    log_error "$SOURCE_DIR is detached at $(git -C "$SOURCE_DIR" rev-parse HEAD) from a pinned install. Re-run with --revision <sha>, or check out a branch."
-  fi
-  log_info "Updating dotfiles source..."
-  if ! git -C "$SOURCE_DIR" pull --ff-only --quiet; then
-    log_error "git pull failed. SSH source sync must work before bootstrap can continue."
-  fi
+  log_info "Updating dotfiles source on $DOTFILES_BRANCH..."
+  checkout_branch
 }
 
 # Clone the workspace repository over SSH, which works once apply has restored
@@ -696,6 +733,8 @@ bootstrap_main() {
   log_header
   collect_inputs
   validate_workspace_repo
+  [ "$(git check-ref-format --branch "$DOTFILES_BRANCH" 2>/dev/null)" = "$DOTFILES_BRANCH" ] ||
+    log_error "CHEZMOI_DOTFILES_BRANCH must be a valid Git branch name."
 
   if is_blank "$repo"; then
     repo="https://github.com/${AGENT_HANDLE_GITHUB}/dotfiles.git"
@@ -708,6 +747,7 @@ bootstrap_main() {
   export CHEZMOI_OP_SSH_ITEM="$OP_SSH_ITEM"
   export CHEZMOI_OP_ACCOUNT_ITEM="$OP_ACCOUNT_ITEM"
   export CHEZMOI_OP_TELEGRAM_ITEM="$OP_TELEGRAM_ITEM"
+  export CHEZMOI_DOTFILES_BRANCH="$DOTFILES_BRANCH"
   export OP_SERVICE_ACCOUNT_TOKEN
 
   # Hold the sync lock across source changes, apply, and workspace creation.

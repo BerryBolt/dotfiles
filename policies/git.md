@@ -37,6 +37,8 @@ Normal delivery uses coherent atomic commits on `main`. The owner may authorize 
 
 Every push to `main` publishes the installer and authorizes automatic setup rollout through the existing sync job. Workstations tracking it can apply within five minutes. A main push is not separate from deployment.
 
+The machine's `data.dotfiles_branch` selects its setup tracking branch on `origin` and defaults to `main`. An explicitly selected candidate branch can receive updates through the same job on the disposable machine. Keep production on `main`. Selecting a branch does not waive candidate acceptance or rollout authorization.
+
 - Push only locally checked commits. Run ShellCheck, Bash syntax checks on rendered scripts, Python parse checks, and the private-data review below.
 - Do not create unit tests, fixture suites, or mocks. Use the existing acceptance scripts and live scenarios on the designated disposable Omarchy environment at pushed exact SHAs.
 - Record exact revisions, observed results, and unperformed checks in the ignored local plan. Never describe a pushed candidate as runtime-accepted before its checks pass.

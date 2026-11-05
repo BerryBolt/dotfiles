@@ -184,6 +184,7 @@ Available in `.tmpl` files:
 | `{{ .op_ssh_item }}`              | SSH Key item title or ID in that vault     |
 | `{{ .op_account_item }}`          | Workstation account (Server) item title or ID in that vault |
 | `{{ .op_telegram_item }}` | Telegram bot item title or ID, default `Telegram Bot - API key` |
+| `{{ .dotfiles_branch }}` | Machine's dotfiles tracking branch, default `main` when absent |
 | `{{ .chezmoi.homeDir }}`          | Home directory path                        |
 | `{{ .chezmoi.arch }}`             | CPU architecture, e.g. `amd64`             |
 | `{{ .chezmoi.hostname }}`         | Machine hostname                           |
