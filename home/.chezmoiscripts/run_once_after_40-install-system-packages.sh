@@ -12,7 +12,6 @@ set -euo pipefail
 # From Arch's repositories. himalaya is the mail client for the agent's
 # mailbox (~/.config/himalaya/config.toml).
 omarchy-pkg-add himalaya
-omarchy-pkg-add syncthing
 
 # Brave holds the agent's synced browser profile. Omarchy's installer adds it
 # from the AUR with Omarchy's browser flags and theme policy.
