@@ -50,6 +50,7 @@ Apply starts two services, the Hermes gateway and T3 Code, and configures no int
 | `~/.bashrc` | `home/modify_dot_bashrc` | Keeps Omarchy's file byte-for-byte and maintains one marked block that defines `op()` as `with-op op`. Fails if the file is missing or the block markers are damaged. |
 | `~/.local/bin/with-op` | `home/dot_local/bin/executable_with-op` | Runs one command with `~/.config/op/env` loaded into that process only. Hermes' browser vault uses it as its `op` binary. |
 | `~/.local/bin/chezmoi-with-op` | `home/dot_local/bin/executable_chezmoi-with-op` | Runs chezmoi with the token for template rendering: a token supplied in the caller's environment wins, otherwise `~/.config/op/env`; with neither it fails. |
+| `~/.local/bin/op-item-metadata` | `home/dot_local/bin/executable_op-item-metadata` | Reads one item through scoped 1Password access and prints category, field schema and attachment metadata without field values. |
 | `~/.config/op/env` | `home/dot_config/private_op/private_env.tmpl` | Token, vault, and `OP_FORMAT=json`; mode 0600 in a 0700 directory. `~/.config` keeps Omarchy's mode. |
 | `~/.config/mise/conf.d/dotfiles.toml` | `home/dot_config/mise/conf.d/dotfiles.toml` | Declares the tools Omarchy does not provide: `chezmoi`, `1password-cli`, `wrangler` (npm backend, on Omarchy's Node), and `tirith`, the scanner Hermes runs on every command. `~/.config/mise/config.toml` stays user-owned. Tools Omarchy provides, such as `gh`, come from its on-demand launchers. |
 | `~/.gitconfig` | `home/dot_gitconfig.tmpl` | Identity and SSH commit/tag signing with `~/.ssh/id_ed25519`. Omarchy's `~/.config/git/config` still applies underneath. |
@@ -141,3 +142,7 @@ Acceptance happens on a disposable Omarchy VM that installs a pushed candidate f
 Global Codex and Claude instruction files reference workspace policies without imposing this publication workflow on other repositories. Apply preserves unrelated global instructions and replaces the previous writing-only links with regular files. Configuration apply still does not require workspace content. Fresh-session loading requires separate runtime acceptance.
 
 The detector inventories secondary worktrees, branch upstreams, and stashes without publishing them. It does not render credentials or detect all manual changes to rendered settings. Task-time and relevant repair verification checks for that drift. No additional sync service, ownership database, or scheduled replay mechanism is introduced.
+
+### Fresh workspace registration
+
+The initial apply omits the repository synchronization job while the workspace checkout is absent. After cloning the workspace, the installer reapplies the setup to register that job and restore the workspace links. Ordinary reapply registers the job when the workspace exists. This ordering satisfies the scheduler requirement that its working directory exist at registration time.

@@ -52,6 +52,10 @@ Hermes treats the backend as locked until the variable named by `vault.onepasswo
 
 Hermes resolves passwords by the field label `password`, so a Login item needs its password field labeled exactly that.
 
+## Inspect item structure
+
+Run `op-item-metadata <item>` to inspect an existing item's category, field names, field types and attachment metadata without printing field values. The command reads only the configured vault through `with-op`. Use it instead of printing raw item JSON in a logged session. Read credential values inside the command that needs them.
+
 ## Rotate the token
 
 The token is not stored in chezmoi data. Supply the new token to `chezmoi-with-op` for one apply; it takes precedence over the old value in the file and re-renders `~/.config/op/env`.

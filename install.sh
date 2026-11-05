@@ -661,8 +661,9 @@ GitHub account $AGENT_HANDLE_GITHUB needs read access to it. Grant it and re-run
 # (home/.chezmoiignore): Hermes' SOUL.md links to the checkout's. Apply them
 # now that the checkout exists; on a repeat install this changes nothing.
 apply_workspace_links() {
-  if ! with_bootstrap_tools chezmoi apply "$HOME/.hermes/SOUL.md"; then
-    log_error "chezmoi apply of ~/.hermes/SOUL.md failed"
+  # Register workspace-dependent jobs only after the workspace exists.
+  if ! with_bootstrap_tools chezmoi apply; then
+    log_error "chezmoi apply after workspace clone failed"
   fi
 }
 
