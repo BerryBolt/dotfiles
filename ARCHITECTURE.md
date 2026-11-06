@@ -58,8 +58,8 @@ Apply starts two services, the Hermes gateway and T3 Code, and configures no int
 | `~/.config/himalaya/config.toml` | `home/dot_config/himalaya/config.toml.tmpl` | The agent's Purelymail mailbox over IMAP and SMTP with TLS. The address comes from the `Purelymail` item at render time; `himalaya` reads the password through `with-op` on each connection, so the file holds none. |
 | `~/.codex/config.toml` | `home/dot_codex/modify_config.toml` | Merged: sets the model (`gpt-6-luna`), high reasoning effort, the ChatGPT login as the only login method, and file credential storage in `~/.codex/auth.json`. Keeps every key Codex writes itself, such as model picks, notices, and project trust. |
 | `~/.claude/settings.json` | `home/dot_claude/modify_private_settings.json` | Merged, mode 0600: turns off Claude Code's commit and PR attribution, sets the default model to Opus 5.5 (`claude-opus-5-5`), and sets `env.CLAUDE_CODE_OAUTH_TOKEN` from the `Claude Code - OAuth token` item. Keeps every other key Claude Code writes itself, such as `/config` choices; a `/model` pick lasts until the next apply. |
-| `~/.codex/AGENTS.md` | `home/dot_codex/modify_AGENTS.md.tmpl` | Preserves unrelated instructions and references the workspace writing and scoped publication policies. |
-| `~/.claude/CLAUDE.md` | `home/dot_claude/modify_CLAUDE.md.tmpl` | Uses the same managed instruction block and preserves unrelated instructions. |
+| `~/.codex/AGENTS.md` | `home/dot_codex/symlink_AGENTS.md.tmpl` | Links to the workspace writing policy. |
+| `~/.claude/CLAUDE.md` | `home/dot_claude/symlink_CLAUDE.md.tmpl` | Links to the workspace writing policy. |
 | `~/.claude.json` | `home/modify_private_dot_claude.json` | Claude Code's runtime state, mode 0600. Sets `hasCompletedOnboarding`, so interactive `claude` skips first-run onboarding and signs in with the token; once the key is set, the file passes through unchanged. |
 | `~/.hermes/config.yaml` | `home/private_dot_hermes/modify_private_config.yaml` | Merged, mode 0600: Hermes' own Codex sign-in to GPT-6 Luna on high effort, 150 turns, never borrowing the Codex CLI's login, Hermes' memory and update check off, the tools for the CLI and for Telegram (Telegram without session search), image generation through Codex, web search through Brave's free plan, the local browser, the brain as home (gateway sessions start in `~/brain` and read its `AGENTS.md`; skills load from, and new skills are saved to, `~/brain/skills`), and command scanning with the manifest's `tirith`, failing closed: when the scanner is missing or fails, the command needs the owner's approval, or is refused where nobody can approve, instead of running unscanned. Keeps every key Hermes writes itself. When every declared key already has its value, the file passes through byte for byte; otherwise it is rewritten, which drops the comments from Hermes' template and sorts the keys. |
 | `~/.hermes/.env` | `home/private_dot_hermes/modify_private_dot_env` | Merged, mode 0600: the Telegram bot token, and the owner's Telegram user ID as the only allowed user and the home chat, from the selected `op_telegram_item`, which defaults to `Telegram Bot - API key`; the Brave Search API key from the `Brave Search - API key` item. Keeps every other line. |
@@ -114,7 +114,7 @@ Use local `chezmoi-with-op apply` for key recovery before attempting SSH source 
 
 ## Safe resumption
 
-A new workstation's Hermes gateway starts live: it takes Telegram turns as soon as it connects. Apply registers a gated repository synchronization and repair job every five minutes. It fetches dirty checkouts for publication diagnostics and only fast-forwards clean tracking branches. Setup apply requires the saved `dotfiles_branch` and its matching upstream on `origin`, and never forces target conflicts. Production uses `main` by default. Publication repair uses two complete observations and at most hourly retries per unresolved repository incident. Apply failures retain hourly retry behavior. See [repository synchronization](runbooks/sync-brain-and-dotfiles.md) for retries and recovery limits.
+A new workstation's Hermes gateway starts live. Apply registers the repository sync job every five minutes. It fast-forwards only clean tracking checkouts without unpushed commits. Setup apply also requires the saved `dotfiles_branch` and its matching upstream on `origin`, and never forces target conflicts. Production defaults to `main`. Unchanged failures wake repair at most hourly. The installer and sync share `run.lock`. See [repository synchronization](runbooks/sync-brain-and-dotfiles.md).
 
 ## Validation
 
@@ -135,13 +135,9 @@ Acceptance happens on a disposable Omarchy VM that installs a pushed candidate f
 8. Removing source management does not authorize deleting existing user data, uninstalling tools, or destroying a workspace.
 9. Completion requires evidence for the workstation fundamentals; package presence alone is insufficient.
 
-## Reviewed publication
+## Publication
 
-`publish-reviewed` commits selected whole files under a common-directory lock, verifies their committed content against reviewed hashes, pushes an immutable signed commit without force, and fetches to prove destination ancestry. The workspace owns the task procedure. [The publication runbook](runbooks/publication.md) defines inputs, the candidate-validation gate, and live acceptance. Existing staged work blocks publication; unrelated unstaged work may remain. Interrupted setup work requires owner resolution.
-
-Global Codex and Claude instruction files reference workspace policies without imposing this publication workflow on other repositories. Apply preserves unrelated global instructions and replaces the previous writing-only links with regular files. Configuration apply still does not require workspace content. Fresh-session loading requires separate runtime acceptance.
-
-The detector inventories secondary worktrees, branch upstreams, and stashes without publishing them. It does not render credentials or detect all manual changes to rendered settings. Task-time and relevant repair verification checks for that drift. No additional sync service, ownership database, or scheduled replay mechanism is introduced.
+Repository instructions require reviewing and signing commits, pushing their explicit SHA with standard Git commands, and checking the fetched destination. The workspace owns that procedure. [Candidate validation](runbooks/candidate-validation.md) separates test acceptance from production rollout. Repair publishes only its own work.
 
 ### Fresh workspace registration
 

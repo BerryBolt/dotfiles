@@ -49,7 +49,7 @@ For an unattended fresh install, set every input in the environment and pass `--
 
 The source comes from `https://github.com/<GitHub handle>/dotfiles.git`. Its tracking branch defaults to `main`. Set `CHEZMOI_DOTFILES_BRANCH` for a machine that must track another branch. The installer saves it as `data.dotfiles_branch` in chezmoi configuration and recovers it on reruns. Old configurations without this key use `main`.
 
-A normal installer run clones the selected branch or selects it in a clean existing source and fast-forwards from `origin`. Before switching, the current branch and any existing selected branch must track their matching branch on `origin` without unpublished commits. Dirty or detached sources block selection. Choosing a candidate branch does not authorize production rollout. Keep production on `main` and follow [candidate acceptance](runbooks/publication.md).
+A normal installer run clones the selected branch or selects it in a clean existing source and fast-forwards from `origin`. Before switching, the current branch and any existing selected branch must track their matching branch on `origin` without unpublished commits. Dirty or detached sources block selection. Choosing a candidate branch does not authorize production rollout. Keep production on `main` and follow [candidate acceptance](runbooks/candidate-validation.md).
 
 After the apply has restored the SSH key, the installer clones the workspace repository into `~/brain` over SSH. When `~/brain` is already a checkout, it leaves it as is.
 
@@ -112,7 +112,7 @@ Acceptance testing installs a pushed candidate from the public GitHub repository
 
 Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. The detector fetches dirty checkouts, inventories unpublished work, and bounds publication repair by repository. Setup apply requires the saved dotfiles branch and its matching `origin` upstream. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
 
-Publish completed brain and setup work through the workspace procedure and `publish-reviewed`. It preserves unrelated unstaged work, refuses existing staging, verifies reviewed whole-file content before push, and fetches again for remote proof. See [helper inputs and candidate acceptance](runbooks/publication.md). Candidate runtime acceptance and agent trials are recorded separately from local code checks.
+Commit and push completed brain and setup work with standard Git commands, following the workspace publication policy. Review the signed commit and verify it on the remote. See [candidate acceptance](runbooks/candidate-validation.md) before setup rollout.
 
 ## License
 

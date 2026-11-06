@@ -6,7 +6,7 @@ Version control practices for this public dotfiles repository.
 
 - Each commit MUST contain one coherent change, with the documentation needed to explain it.
 - Group interdependent files by observable behavior, not by file type. Do not split a change so that a commit depends on uncommitted work to function.
-- Review the full intended delta before committing. Existing staging belongs to its owner and blocks publication. Do not reorganize, unstage, or consume another session's staging.
+- Review the full intended delta before committing. Existing staging belongs to its owner. Stop if it overlaps your selected files. Do not reorganize, unstage, or consume another session's staging.
 - Avoid WIP dumps and unrelated changes in one commit. A change spanning many files can still be atomic when it produces one outcome.
 - Validate the actual commit candidate. Checks that depend on additional unstaged changes do not validate that commit.
 
@@ -33,7 +33,7 @@ feat: install a selected dotfiles revision from GitHub
 
 The intended destination is the remote default branch unless the owner selects a PR or another branch. A missing upstream or ambiguous destination blocks publication.
 
-Normal delivery uses coherent atomic commits on `main`. The owner may authorize a candidate/test-ref exception. Under that exception, publish workspace prerequisites first, then setup candidates. Install the pushed full setup SHA with its matching installer on the disposable Omarchy environment. Complete live acceptance before merging, and obtain explicit rollout authority. Follow [the candidate and acceptance runbook](../runbooks/publication.md).
+Normal delivery uses coherent atomic commits on `main`. The owner may authorize a candidate/test-ref exception. Under that exception, publish workspace prerequisites first, then setup candidates. Install the pushed full setup SHA with its matching installer on the disposable Omarchy environment. Complete live acceptance before merging, and obtain explicit rollout authority. Follow [the candidate and acceptance runbook](../runbooks/candidate-validation.md).
 
 Every push to `main` publishes the installer and authorizes automatic setup rollout through the existing sync job. Workstations tracking it can apply within five minutes. A main push is not separate from deployment.
 
@@ -41,20 +41,19 @@ The machine's `data.dotfiles_branch` selects its setup tracking branch on `origi
 
 - Push only locally checked commits. Run ShellCheck, Bash syntax checks on rendered scripts, Python parse checks, and the private-data review below.
 - Do not create unit tests, fixture suites, or mocks. Use the existing acceptance scripts and live scenarios on the designated disposable Omarchy environment at pushed exact SHAs.
+- Run `tests/assertions.sh` and `tests/recovery.sh` for the affected workstation behavior. Download `install.sh` from the pushed full SHA and pass that same SHA to `--revision`.
 - Record exact revisions, observed results, and unperformed checks in the ignored local plan. Never describe a pushed candidate as runtime-accepted before its checks pass.
 - Make fixes as new signed commits. Never amend pushed work.
 
 ## Publication in shared checkouts
 
-Before reporting a durable change complete, publish reviewed whole files in the same session and verify the intended destination with a fresh remote read. New files and deletions count. Follow the workspace's `~/brain/policies/publication.md` and use `publish-reviewed`. The helper format is in [runbooks/publication.md](../runbooks/publication.md).
+Before reporting a durable change complete, commit and push the intended files with standard Git commands, then fetch to confirm the remote contains the commit. Follow `~/brain/policies/publication.md` for the command sequence. New files and deletions count. Review the actual signed commit and every earlier unpushed commit before pushing its explicit SHA.
 
-Record the root, branch, upstream, HEAD, intended paths, destination, and pre-existing edits before working. Preserve other sessions' work. The helper takes one publication lock per Git common directory, refuses staging, rechecks reviewed hashes, signs a `git commit --only`, verifies its actual tree and delta, pushes without force, fetches again, and verifies ancestry. Unrelated unstaged work may remain. Same-file edits need serial ownership and a fresh whole-file review. Partial-file publication is unsupported.
+Preserve other sessions' staging and edits. Use `git commit -S -m "<message>" -- <paths>` to commit selected whole files without consuming unrelated staging. Add new files explicitly first. If another session edits or stages the same file, coordinate before committing it.
 
-Fetch before integration. Fast-forward only when unrelated work is safe. If integration changes selected files, re-review and revalidate them. After a rejected push or divergence, retain the unpublished commit. For a manual signed merge, hold the same common-directory publication lock continuously through fetch, inspection, and merge. Require a clean checkout and recheck the inspected branch and HEAD immediately before merging the exact inspected remote SHA. Release the lock, then review and run required validation before invoking the helper again. Follow the workspace's manual merge procedure. Conflicts or unrelated staged or unstaged work block integration. Never rebase or autostash.
+After a rejected push, retain the commit. Fetch and inspect both sides. Merge only in a clean checkout with `git merge -S --no-autostash <reviewed-remote-SHA>`, then review and validate the result before pushing. Never rebase or autostash. Repair publishes only its own changes; other sessions' interrupted work waits for owner resolution.
 
-For direct delivery, a fresh destination must contain the published commit according to `git merge-base --is-ancestor`. A newer descendant is valid. PR work is "pushed, not landed" until GitHub reports a merge. Record the merge result and verify it on the default branch. Squash merges do not need to retain the original SHA.
-
-Interrupted or unattributed dotfiles work requires owner resolution. Do not publish it unattended. Existing task records, file age, changed-file instructions, or a clean index alone cannot authorize someone else's changes.
+Report PR work as "pushed, not landed" until GitHub reports a merge and a fresh fetch confirms its merge result on the default branch.
 
 Checking out old history can overwrite or delete now-ignored inputs such as `PLAN.md`. Preserve those inputs before any authorized historical checkout.
 
