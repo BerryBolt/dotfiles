@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import tomllib
 
 
 class Deferred(RuntimeError):
@@ -21,6 +22,15 @@ def run(*args):
         operation = args[0] + (" " + args[3] if args[0] == "git" else "")
         raise RuntimeError(operation + " exited " + str(result.returncode))
     return result.stdout.strip()
+
+
+def configured_dotfiles_branch():
+    config = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'chezmoi/chezmoi.toml'
+    with config.open('rb') as stream:
+        branch = tomllib.load(stream).get('data', {}).get('dotfiles_branch', 'main')
+    if not isinstance(branch, str) or not branch or run('git', 'check-ref-format', '--branch', branch) != branch:
+        raise ValueError('invalid dotfiles_branch')
+    return branch
 
 
 def sync(repo, apply=False):
@@ -37,6 +47,13 @@ def sync(repo, apply=False):
         raise Deferred("checkout dirty")
     branch = git("symbolic-ref", "--short", "HEAD")
     remote = git("config", "--get", "branch." + branch + ".remote")
+    if remote == ".":
+        raise Deferred("checkout has no remote upstream")
+    if apply:
+        selected = configured_dotfiles_branch()
+        destination = git("config", "--get", "branch." + branch + ".merge")
+        if branch != selected or remote != "origin" or destination != "refs/heads/" + selected:
+            raise Deferred("setup requires configured dotfiles_branch and its origin upstream")
     git("fetch", "--quiet", remote)
     if git("symbolic-ref", "--quiet", "HEAD") != original_branch:
         raise Deferred("branch changed during fetch")
@@ -45,8 +62,12 @@ def sync(repo, apply=False):
     ahead, _ = map(int, git("rev-list", "--left-right", "--count", "HEAD...@{upstream}").split())
     if ahead:
         raise Deferred("checkout ahead or diverged")
-    git("merge", "--ff-only", "--quiet", "@{upstream}")
+    git("-c", "merge.autostash=false", "merge", "--ff-only", "--quiet", "@{upstream}")
     sha = git("rev-parse", "HEAD")
+    if git("symbolic-ref", "--quiet", "HEAD") != original_branch or git("status", "--porcelain", "--untracked-files=all"):
+        raise Deferred("checkout changed during sync")
+    if sha != git("rev-parse", "@{upstream}"):
+        raise Deferred("checkout changed after upstream check")
     if apply:
         marker = state / "applied-sha"
         if not marker.exists() or marker.read_text().strip() != sha:
@@ -60,7 +81,7 @@ def sync(repo, apply=False):
             pending.replace(attempt)
             # EOF rejects conflicts on targets already recorded by chezmoi.
             run("chezmoi-with-op", "--no-tty", "--force=false", "apply")
-            if git("rev-parse", "HEAD") != sha or git("status", "--porcelain"):
+            if git("rev-parse", "HEAD") != sha or git("symbolic-ref", "--quiet", "HEAD") != original_branch or git("status", "--porcelain", "--untracked-files=all"):
                 raise RuntimeError("source changed during apply")
             temp = state / "applied-sha.tmp"
             temp.write_text(sha + "\n")
@@ -76,6 +97,7 @@ def main():
         return 2
     scheduled = sys.argv[1:] == ["--scheduled"]
     os.environ["PATH"] = str(Path.home() / ".local/bin") + ":" + str(Path.home() / ".local/share/mise/shims") + ":" + os.environ.get("PATH", "/usr/bin:/bin")
+    os.environ["GIT_OPTIONAL_LOCKS"] = "0"
     os.environ["GIT_TERMINAL_PROMPT"] = "0"
     os.environ["GIT_SSH_COMMAND"] = "ssh -o BatchMode=yes -o ConnectTimeout=20"
     state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "sync-brain-and-dotfiles"

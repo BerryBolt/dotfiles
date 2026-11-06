@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Inspect a 1Password item's structure without printing credential values."""
+import argparse
+import json
+import subprocess
+import sys
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('item', help='item title or ID in the configured vault')
+    args = parser.parse_args()
+    result = subprocess.run(
+        ['with-op', 'bash', '-c',
+         'exec op item get "$1" --vault "$OP_VAULT" --format json',
+         'op-item-metadata', args.item],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+    if result.returncode:
+        raise ValueError('item read failed')
+    item = json.loads(result.stdout)
+    # Allowlist keys instead of trying to identify every possible secret field.
+    output = {key: item.get(key) for key in ('id', 'title', 'category')}
+    output['fields'] = [
+        {**{key: field.get(key) for key in ('id', 'label', 'type', 'purpose')},
+         'has_value': bool(field.get('value'))}
+        for field in item.get('fields', [])]
+    output['files'] = [
+        {key: file.get(key) for key in ('id', 'name', 'size')}
+        for file in item.get('files', [])]
+    print(json.dumps(output, indent=2))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, OSError, subprocess.SubprocessError):
+        print('op-item-metadata: could not inspect item; credential output withheld', file=sys.stderr)
+        sys.exit(1)

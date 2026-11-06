@@ -162,8 +162,9 @@ The `op` shell wrapper loads `~/.config/op/env` for each call automatically (see
 | API key or token | `API Credential` | `--category="API Credential"` |
 | SSH key | `SSH Key` | `--category="SSH Key"` |
 | Credential file (JSON/PEM) | `Document` | `--category="Document"` |
+| Repository encryption passphrase | `Password` | `--category="Password"` |
 
-MUST use the correct category. MUST NOT use generic categories like `Password` or `Secure Note` for credentials.
+MUST use the correct category. MUST NOT use generic `Password` or `Secure Note` items for service credentials. Use `Password` for non-service encryption passphrases, such as a Restic repository password.
 
 ### Naming conventions (mandatory)
 
@@ -175,6 +176,7 @@ MUST use the correct category. MUST NOT use generic categories like `Password` o
 | Subscription OAuth token | `<Service> - OAuth token` | `Claude Code - OAuth token` |
 | Credential file | `<Service> - Credential File` | `Google Cloud - Credential File` |
 | SSH key | `<key filename>` | `id_ed25519` (new items) |
+| Repository encryption passphrase | `<Software> repository encryption - <scope>` | `Restic repository encryption - backups` |
 
 Rules:
 - MUST use regular hyphen (` - `), MUST NOT use em-dash (`—`)
@@ -194,6 +196,7 @@ Rules:
 | API Credential | credential | notes (linked login) |
 | SSH Key | private_key | - |
 | Document | file attachment | notes (linked login) |
+| Password | password | notes |
 
 ### Linking rules
 

@@ -6,7 +6,7 @@ Version control practices for this public dotfiles repository.
 
 - Each commit MUST contain one coherent change, with the documentation needed to explain it.
 - Group interdependent files by observable behavior, not by file type. Do not split a change so that a commit depends on uncommitted work to function.
-- Review the full staged and unstaged delta before committing. Existing staging is not an approved commit boundary; reorganize it without discarding file contents.
+- Review the full intended delta before committing. Existing staging belongs to its owner. Stop if it overlaps your selected files. Do not reorganize, unstage, or consume another session's staging.
 - Avoid WIP dumps and unrelated changes in one commit. A change spanning many files can still be atomic when it produces one outcome.
 - Validate the actual commit candidate. Checks that depend on additional unstaged changes do not validate that commit.
 
@@ -29,24 +29,33 @@ fix: restore credential env through reapply
 feat: install a selected dotfiles revision from GitHub
 ```
 
-## Working on `main`
+## Destination and rollout
 
-Commit and push directly to `main` on [BerryBolt/dotfiles](https://github.com/BerryBolt/dotfiles); do not create implementation or candidate branches. `https://berrybolt.bot/install.sh` redirects to `install.sh` on `main`, so every push to `main` is immediately the published installer.
+The intended destination is the remote default branch unless the owner selects a PR or another branch. A missing upstream or ambiguous destination blocks publication.
 
-- Push only commits that pass the local checks (`shellcheck`, `bash -n` on rendered scripts, the private-data review below). Push with plain fast-forwards.
-- Do not add unit tests, fixture suites, or mocked environments (fake `op`, throwaway homes). Validate behavior on the disposable Omarchy VM with `tests/assertions.sh` and `tests/recovery.sh` against the pushed SHA.
-- Validate on the disposable VM after pushing: install from `raw.githubusercontent.com/BerryBolt/dotfiles/<full-sha>/install.sh` with `--revision <full-sha>`, so the installer and chezmoi source are the same pushed commit. Follow the ignored local `PLAN.md` (when present) for the exact sequence and target.
-- Commit and push fixes as new commits. Reset the disposable VM test setup before each fresh-install attempt until installation passes; then complete the broader checks and final acceptance run.
-- Record test evidence without real credentials or secret-bearing logs. Mark unperformed tests explicitly.
-- Do not describe a pushed commit as verified before its tests pass.
+Normal delivery uses coherent atomic commits on `main`. The owner may authorize a candidate/test-ref exception. Under that exception, publish workspace prerequisites first, then setup candidates. Install the pushed full setup SHA with its matching installer on the disposable Omarchy environment. Complete live acceptance before merging, and obtain explicit rollout authority. Follow [the candidate and acceptance runbook](../runbooks/candidate-validation.md).
 
-## Synchronization and staging
+Every push to `main` publishes the installer and authorizes automatic setup rollout through the existing sync job. Workstations tracking it can apply within five minutes. A main push is not separate from deployment.
 
-Check local changes and remote state before beginning work. Fetch and inspect divergence; fast-forward `main` with `git merge --ff-only origin/main` while it is checked out. Do not pull into a mixed working tree merely to satisfy a synchronization ritual.
+The machine's `data.dotfiles_branch` selects its setup tracking branch on `origin` and defaults to `main`. An explicitly selected candidate branch can receive updates through the same job on the disposable machine. Keep production on `main`. Selecting a branch does not waive candidate acceptance or rollout authorization.
 
-Stage only the reviewed files or hunks for the intended commit. Confirm `git diff --cached` matches the logical change, then commit and push `main`. Remaining local work must stay intact for subsequent commits.
+- Push only locally checked commits. Run ShellCheck, Bash syntax checks on rendered scripts, Python parse checks, and the private-data review below.
+- Do not create unit tests, fixture suites, or mocks. Use the existing acceptance scripts and live scenarios on the designated disposable Omarchy environment at pushed exact SHAs.
+- Run `tests/assertions.sh` and `tests/recovery.sh` for the affected workstation behavior. Download `install.sh` from the pushed full SHA and pass that same SHA to `--revision`.
+- Record exact revisions, observed results, and unperformed checks in the ignored local plan. Never describe a pushed candidate as runtime-accepted before its checks pass.
+- Make fixes as new signed commits. Never amend pushed work.
 
-Checking out a commit that still tracked a now-ignored local file (such as `PLAN.md` before it was untracked) overwrites that file, and moving forward again deletes it. Back up ignored local files before checking out older commits.
+## Publication in shared checkouts
+
+Before reporting a durable change complete, commit and push the intended files with standard Git commands, then fetch to confirm the remote contains the commit. Follow `~/brain/policies/publication.md` for the command sequence. New files and deletions count. Review the actual signed commit and every earlier unpushed commit before pushing its explicit SHA.
+
+Preserve other sessions' staging and edits. Use `git commit -S -m "<message>" -- <paths>` to commit selected whole files without consuming unrelated staging. Add new files explicitly first. If another session edits or stages the same file, coordinate before committing it.
+
+After a rejected push, retain the commit. Fetch and inspect both sides. Merge only in a clean checkout with `git merge -S --no-autostash <reviewed-remote-SHA>`, then review and validate the result before pushing. Never rebase or autostash. Repair publishes only its own changes; other sessions' interrupted work waits for owner resolution.
+
+Report PR work as "pushed, not landed" until GitHub reports a merge and a fresh fetch confirms its merge result on the default branch.
+
+Checking out old history can overwrite or delete now-ignored inputs such as `PLAN.md`. Preserve those inputs before any authorized historical checkout.
 
 ## Prohibited operations
 
@@ -62,5 +71,3 @@ Commit source templates, bootstrap scripts, acceptance scripts, policies, skills
 Do not commit real secrets/tokens, SSH private keys, machine-local chezmoi configuration, credential env files, volatile runtime state, large binaries, or OS-generated files. Do not commit disposable login credentials, machine addresses, private infrastructure names/topology, private repository links, or live vault layouts. Keep these in ignored local inputs. Public keys and generic variable names are not secret; private keys and real access values are.
 
 Before pushing, inspect both the actual staged diff and the committed candidate for private operational data. Ignore rules do not remove data already staged or tracked. Never force-add `PLAN.md`, `.env`, `tests/.env.local`, or `.local/`.
-
-Pushing to `main` publishes the installer through the endpoint. Deployment to a dedicated workstation remains a separate, explicit step.

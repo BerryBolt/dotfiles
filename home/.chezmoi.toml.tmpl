@@ -7,6 +7,7 @@
 {{- /* Server item (title or ID) holding this account's OS login; used for sudo. */ -}}
 {{- $op_account_item := or (env "CHEZMOI_OP_ACCOUNT_ITEM") (promptStringOnce . "op_account_item" "1Password workstation account item (title or ID)") -}}
 {{- $op_telegram_item := or (env "CHEZMOI_OP_TELEGRAM_ITEM") (get . "op_telegram_item") "Telegram Bot - API key" -}}
+{{- $dotfiles_branch := or (env "CHEZMOI_DOTFILES_BRANCH") (get . "dotfiles_branch") "main" -}}
 {{- /* Token is read from env by private_env.tmpl, never persisted in [data]. */ -}}
 {{- if eq (env "OP_SERVICE_ACCOUNT_TOKEN") "" -}}
 {{- fail "OP_SERVICE_ACCOUNT_TOKEN must be set in env. Bootstrap via install.sh — it is the only supported entry point." -}}
@@ -20,6 +21,7 @@
   op_ssh_item = {{ $op_ssh_item | quote }}
   op_account_item = {{ $op_account_item | quote }}
   op_telegram_item = {{ $op_telegram_item | quote }}
+  dotfiles_branch = {{ $dotfiles_branch | quote }}
 
 [onepassword]
   mode = "service"

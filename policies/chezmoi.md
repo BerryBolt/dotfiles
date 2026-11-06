@@ -39,11 +39,9 @@ Defines how this repo is managed through chezmoi, what files belong under manage
 └── tests/
 ```
 
-### Shared writing instructions
+### Agent instructions
 
-The workspace owns `~/brain/policies/writing.md`. Codex's `~/.codex/AGENTS.md` and Claude Code's `~/.claude/CLAUDE.md` link to it. Publish and pull the workspace policy before applying these links to an existing workstation. Inspect both destination files first and preserve any existing instructions before replacing them.
-
-On a fresh install, the links initially have no target and resolve after the installer clones the workspace. They need no second apply. Acceptance checks require the policy to exist. Verify that each CLI loads it in a fresh session before relying on it.
+Codex and Claude global instruction files link to `~/brain/policies/writing.md`. Repository `AGENTS.md` files carry their publication rules. Apply does not require the workspace content to exist.
 
 ### Extending files that others also write
 
@@ -182,6 +180,7 @@ Available in `.tmpl` files:
 | `{{ .op_ssh_item }}`              | SSH Key item title or ID in that vault     |
 | `{{ .op_account_item }}`          | Workstation account (Server) item title or ID in that vault |
 | `{{ .op_telegram_item }}` | Telegram bot item title or ID, default `Telegram Bot - API key` |
+| `{{ .dotfiles_branch }}` | Machine's dotfiles tracking branch, default `main` when absent |
 | `{{ .chezmoi.homeDir }}`          | Home directory path                        |
 | `{{ .chezmoi.arch }}`             | CPU architecture, e.g. `amd64`             |
 | `{{ .chezmoi.hostname }}`         | Machine hostname                           |

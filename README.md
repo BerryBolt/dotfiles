@@ -47,7 +47,9 @@ For an unattended fresh install, set every input in the environment and pass `--
 
 `https://berrybolt.bot/install.sh` redirects to `install.sh` on this repository's `main` branch.
 
-The source comes from `https://github.com/<GitHub handle>/dotfiles.git`, on its default branch unless you pin a revision.
+The source comes from `https://github.com/<GitHub handle>/dotfiles.git`. Its tracking branch defaults to `main`. Set `CHEZMOI_DOTFILES_BRANCH` for a machine that must track another branch. The installer saves it as `data.dotfiles_branch` in chezmoi configuration and recovers it on reruns. Old configurations without this key use `main`.
+
+A normal installer run clones the selected branch or selects it in a clean existing source and fast-forwards from `origin`. Before switching, the current branch and any existing selected branch must track their matching branch on `origin` without unpublished commits. Dirty or detached sources block selection. Choosing a candidate branch does not authorize production rollout. Keep production on `main` and follow [candidate acceptance](runbooks/candidate-validation.md).
 
 After the apply has restored the SSH key, the installer clones the workspace repository into `~/brain` over SSH. When `~/brain` is already a checkout, it leaves it as is.
 
@@ -63,7 +65,7 @@ curl -fsSL "https://raw.githubusercontent.com/BerryBolt/dotfiles/$sha/install.sh
   | bash -s -- --revision "$sha"
 ```
 
-`--revision` (or `DOTFILES_REVISION`) accepts only a full commit SHA. On a fresh install the installer clones the repository and detaches at that commit. On a repeat install it fetches the commit over the existing SSH remote when needed and detaches there. It stops if the commit cannot be fetched or the existing source has local modifications. A later run without `--revision` refuses a detached source instead of silently moving it.
+`--revision` or `DOTFILES_REVISION` accepts only a full commit SHA and overrides branch selection for this install. On a fresh install the installer clones the repository and detaches at that commit. On a repeat install it fetches the commit over the existing SSH remote when needed and detaches there. It stops if the commit cannot be fetched or the existing source has local modifications. The saved branch choice remains available for later tracking. A later run without `--revision` refuses a detached source until the operator explicitly checks out the intended tracking branch.
 
 ## Result
 
@@ -74,7 +76,7 @@ op whoami                    # service account; the token stays in op's subshell
 with-op bash -c 'op read "op://$OP_VAULT/<item>/<field>"'
 chezmoi-with-op apply        # reapply managed files and SSH restoration
 ssh -T git@github.com        # authenticates with the restored key
-git -C ~/brain pull          # the workspace checkout, cloned by the installer
+sync-brain-and-dotfiles      # inspect and fast-forward clean tracking checkouts
 git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
@@ -108,7 +110,9 @@ Acceptance testing installs a pushed candidate from the public GitHub repository
 
 ## Repository synchronization
 
-Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
+Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. The detector fetches dirty checkouts, inventories unpublished work, and bounds publication repair by repository. Setup apply requires the saved dotfiles branch and its matching `origin` upstream. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
+
+Commit and push completed brain and setup work with standard Git commands, following the workspace publication policy. Review the signed commit and verify it on the remote. See [candidate acceptance](runbooks/candidate-validation.md) before setup rollout.
 
 ## License
 
