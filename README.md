@@ -90,6 +90,8 @@ t3 service status            # T3 Code's background service, at the version pinn
 
 Omarchy remains responsible for its desktop, shell defaults, and existing tools. This repo adds only the account configuration listed in [Managed state](ARCHITECTURE.md#managed-state). See [the recovery contract](ARCHITECTURE.md#recovery) for the limited repair scope.
 
+To link this workstation from the owner's T3 Code desktop app, follow [Link T3 Code](runbooks/link-t3-code.md).
+
 ## Layout
 
 | Path | Role |

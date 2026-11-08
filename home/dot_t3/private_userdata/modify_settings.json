@@ -5,4 +5,6 @@
 {{-   $settings = fromJson .chezmoi.stdin -}}
 {{- end -}}
 {{- $settings = setValueAtPath "favorites" (list (dict "provider" "codex" "model" "gpt-6.1-sol")) $settings -}}
+{{- /* Lets the owner's T3 Code link this workstation. */ -}}
+{{- $settings = setValueAtPath "linkedEnvironmentsEnabled" true $settings -}}
 {{ toPrettyJson $settings }}
