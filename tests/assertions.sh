@@ -372,6 +372,21 @@ from pathlib import Path
 assert job.get("workdir") == str(Path.home() / "brain")
 PYTHON
 '
+check "Hermes has one monthly release check job" bash -c '
+  cd "$HOME/.hermes/hermes-agent" || exit 1
+  venv/bin/python - <<"PYTHON"
+from cron.jobs import list_jobs
+jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "hermes-release-check"]
+assert len(jobs) == 1
+job = jobs[0]
+assert job.get("no_agent") is True
+assert job.get("script") == "hermes-release-check.sh"
+assert job.get("schedule", {}).get("expr") == "0 9 1 * *"
+assert job.get("deliver") == "telegram"
+PYTHON
+'
+check "the Hermes release check reads the pin and Hermes' release tags" \
+  bash "$HOME/.hermes/scripts/hermes-release-check.sh"
 
 echo ""
 printf '%d passed, %d failed\n' "$pass" "$fail"
