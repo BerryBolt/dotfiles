@@ -1,8 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
-cd "$HOME/.hermes/hermes-agent"
-venv/bin/python <<'PY'
+hermes-python <<'PY'
 import fcntl
 from pathlib import Path
 from cron.jobs import create_job, list_jobs, update_job

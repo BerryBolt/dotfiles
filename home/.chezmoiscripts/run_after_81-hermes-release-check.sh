@@ -2,8 +2,8 @@
 # Registers Hermes' monthly release check: a script job with no model call that
 # sends its output to Telegram. See runbooks/update-hermes.md.
 set -euo pipefail
-cd "$HOME/.hermes/hermes-agent"
-venv/bin/python <<'PY'
+export PATH="$HOME/.local/bin:$PATH"
+hermes-python <<'PY'
 from cron.jobs import create_job, list_jobs, update_job
 
 name = 'hermes-release-check'

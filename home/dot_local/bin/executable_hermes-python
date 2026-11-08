@@ -1,0 +1,13 @@
+#!/bin/bash
+# Runs the Python program on stdin inside Hermes' own environment, with the
+# Hermes checkout importable and the arguments in sys.argv[1:]. The launcher
+# names the interpreter, so the setup does not depend on where Hermes keeps it.
+set -euo pipefail
+root="$HOME/.hermes/hermes-agent"
+python="$("$root/.hermes/bin/hermes" --print-runtime-command | jq -r '.[0]')"
+cd "$root"
+exec "$python" -I -c 'import sys
+sys.path.insert(0, sys.argv.pop(1))
+sys._hermes_pin_default_home = True
+import hermes_bootstrap
+exec(compile(sys.stdin.read(), "<stdin>", "exec"))' "$root" "$@"
