@@ -81,10 +81,10 @@ git commit -S ...            # commits are signed by default
 sudo -n true                 # the account has passwordless sudo
 himalaya envelope list       # the agent's inbox (password read from 1Password per connection)
 codex login --device-auth    # when not signed in (an attended install runs it); the owner approves the code
-codex exec "..."             # GPT-6 Luna on high, on the ChatGPT login only
+codex exec "..."             # GPT-6.1 Terra on high, on the ChatGPT login only
 claude -p "..."              # Opus 5.5 on the subscription token
 hermes auth add openai-codex --type oauth  # when not signed in (an attended install runs it): Hermes' own Codex login
-hermes -z "..."               # GPT-6 Luna through Hermes' own sign-in, at the release pinned in apply script 50
+hermes -z "..."               # GPT-6.1 Terra through Hermes' own sign-in, at the release pinned in apply script 50
 t3 service status            # T3 Code's background service, at the version pinned in apply script 70
 ```
 

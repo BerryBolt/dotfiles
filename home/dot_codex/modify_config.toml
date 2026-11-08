@@ -8,7 +8,7 @@
 {{- if .chezmoi.stdin -}}
 {{-   $config = fromToml .chezmoi.stdin -}}
 {{- end -}}
-{{- $config = setValueAtPath "model" "gpt-6-luna" $config -}}
+{{- $config = setValueAtPath "model" "gpt-6.1-terra" $config -}}
 {{- $config = setValueAtPath "model_reasoning_effort" "high" $config -}}
 {{- /* The subscription login only: a run never bills the API. */ -}}
 {{- $config = setValueAtPath "forced_login_method" "chatgpt" $config -}}

@@ -170,7 +170,7 @@ hermes_answers() {
     timeout 300 hermes -z "$PROMPT" --usage-file "$WORK/hermes-usage.json" \
       </dev/null >"$WORK/hermes-answer" 2>/dev/null) &&
     answered_ok "$WORK/hermes-answer" &&
-    jq -e '.model == "gpt-6-luna" and .provider == "openai-codex" and .cost_status == "included"' \
+    jq -e '.model == "gpt-6.1-terra" and .provider == "openai-codex" and .cost_status == "included"' \
       "$WORK/hermes-usage.json" >/dev/null
 }
 
@@ -222,7 +222,7 @@ check "~/.hermes/config.yaml and ~/.hermes/.env are 600 (.env holds tokens)" \
   bash -c '[ "$(stat -c %a "$1/config.yaml")/$(stat -c %a "$1/.env")" = 600/600 ]' _ "$HOME/.hermes"
 check "Hermes has its own Codex sign-in" \
   bash -c 'hermes auth status openai-codex 2>&1 | grep -qx "openai-codex: logged in"'
-check "Hermes answers on GPT-6 Luna through the subscription (live call)" hermes_answers
+check "Hermes answers on GPT-6.1 Terra through the subscription (live call)" hermes_answers
 check "the Telegram bot token in ~/.hermes/.env is live (getMe)" telegram_bot_answers
 check "the Brave Search key in ~/.hermes/.env answers a query" brave_search_answers
 check "tirith resolves through mise" tirith --version

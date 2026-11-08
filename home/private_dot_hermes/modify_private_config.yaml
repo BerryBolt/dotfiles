@@ -15,7 +15,7 @@
 {{- $config := fromYaml .chezmoi.stdin -}}
 {{- $declared := dict -}}
 {{- $declared = set $declared "model.provider" "openai-codex" -}}
-{{- $declared = set $declared "model.default" "gpt-6-luna" -}}
+{{- $declared = set $declared "model.default" "gpt-6.1-terra" -}}
 {{- $declared = set $declared "model.base_url" "https://chatgpt.com/backend-api/codex" -}}
 {{- $declared = set $declared "agent.reasoning_effort" "high" -}}
 {{- $declared = set $declared "agent.max_turns" 150 -}}
