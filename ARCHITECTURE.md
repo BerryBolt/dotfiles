@@ -119,7 +119,7 @@ A new workstation's Hermes gateway starts live. Apply registers the repository s
 
 Apply also registers a monthly Hermes release check. The job runs `~/.hermes/scripts/hermes-release-check.sh` with no model call. It sends a Telegram notice when the newest stable Hermes release differs from the pin in apply script 50. Hermes moves to a new release only through a pin change that passes the acceptance checks. See [Hermes updates](runbooks/update-hermes.md).
 
-An optional `handbook_updater_checkout` data value registers a repository-owned release check. Dotfiles manages its Hermes script link and job registration. An empty value leaves the integration unconfigured. See [scheduled handbook release](runbooks/handbook-release.md).
+An optional `handbook_updater_checkout` data value registers a repository-owned release check. Dotfiles manages its Hermes script wrapper and job registration. An empty value leaves the integration unconfigured. See [scheduled handbook release](runbooks/handbook-release.md).
 
 ## Validation
 

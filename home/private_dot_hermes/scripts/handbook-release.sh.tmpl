@@ -1,0 +1,4 @@
+#!/bin/bash
+# Hermes requires its scheduled script to stay in its scripts directory.
+set -euo pipefail
+exec bash {{ joinPath .handbook_updater_checkout "scripts/handbook-release.sh" | quote }}
