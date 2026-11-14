@@ -13,6 +13,8 @@
 {{- fail "OP_SERVICE_ACCOUNT_TOKEN must be set in env. Bootstrap via install.sh — it is the only supported entry point." -}}
 {{- end -}}
 
+{{- $handbook_updater_checkout := or (get . "handbook_updater_checkout") "" -}}
+
 [data]
   agent_name = {{ $agent_name | quote }}
   agent_email = {{ $agent_email | quote }}
@@ -22,6 +24,7 @@
   op_account_item = {{ $op_account_item | quote }}
   op_telegram_item = {{ $op_telegram_item | quote }}
   dotfiles_branch = {{ $dotfiles_branch | quote }}
+  handbook_updater_checkout = {{ $handbook_updater_checkout | quote }}
 
 [onepassword]
   mode = "service"
