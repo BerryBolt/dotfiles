@@ -27,10 +27,20 @@ fi
 systemctl --user daemon-reload
 systemctl --user enable --quiet "$service"
 if systemctl --user is-active --quiet "$service"; then
-    # A graceful restart waits for turns in progress. It runs in the
-    # background, so an apply started from a gateway turn can finish that turn.
-    systemd-run --user --collect --quiet --setenv=PATH="$PATH" "$HOME/.local/bin/hermes" gateway restart
-    echo "The Hermes gateway restarts once its turns in progress finish."
+    # Hermes refuses to restart while any session is live, and an apply from
+    # the sync job is itself a live cron session. Retry in the background each
+    # minute, for up to two hours, while Hermes reports live sessions, so the
+    # turn that started this apply can finish first.
+    # shellcheck disable=SC2016  # expanded by the background shell
+    systemd-run --user --collect --quiet --setenv=PATH="$PATH" bash -c '
+        for _ in $(seq 120); do
+            if out=$(hermes gateway restart </dev/null 2>&1); then exit 0; fi
+            grep -q "Refusing to restart" <<<"$out" || { printf "%s\n" "$out" >&2; exit 1; }
+            sleep 60
+        done
+        echo "Hermes gateway restart still refused after two hours" >&2
+        exit 1'
+    echo "The Hermes gateway restarts once no session is live."
 else
     hermes gateway start
 fi
