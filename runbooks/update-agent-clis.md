@@ -1,6 +1,6 @@
 # Agent CLI updates
 
-Chezmoi manages the update script and registers `update-agent-clis` in Hermes on every apply. Hermes runs it daily at 09:15 in its scheduler timezone, without a model call.
+Chezmoi manages the update script and registers `update-agent-clis` in Hermes on every apply. Hermes runs it daily at 03:00 in its scheduler timezone, without a model call.
 
 The script uses Omarchy's launchers to register missing tools, then runs `mise upgrade --yes --global --no-prune codex claude`. It follows `latest` and sets the minimum release age to zero, matching Omarchy 4.0.6's launchers. Review that choice when Omarchy changes its launcher policy.
 

@@ -6,7 +6,7 @@ hermes-python <<'PY'
 from cron.jobs import create_job, list_jobs, update_job
 
 name = 'update-agent-clis'
-schedule = '15 9 * * *'
+schedule = '0 3 * * *'
 fields = dict(script='update-agent-clis.sh', no_agent=True, deliver='telegram')
 matches = [j for j in list_jobs(include_disabled=True) if j.get('name') == name]
 if len(matches) > 1:

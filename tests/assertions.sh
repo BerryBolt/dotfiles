@@ -401,7 +401,7 @@ assert len(jobs) == 1
 job = jobs[0]
 assert job.get("no_agent") is True
 assert job.get("script") == "update-agent-clis.sh"
-assert job.get("schedule", {}).get("expr") == "15 9 * * *"
+assert job.get("schedule", {}).get("expr") == "0 3 * * *"
 assert job.get("deliver") == "telegram"
 assert (Path.home() / ".hermes/scripts/update-agent-clis.sh").is_file()
 PYTHON
