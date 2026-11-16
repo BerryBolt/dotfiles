@@ -16,3 +16,8 @@
 {{ if not (get . "handbook_updater_checkout") -}}
 .hermes/scripts/handbook-release.sh
 {{ end -}}
+
+{{ if not (get . "agent_tools_repository") -}}
+.codex/skills/manage-handbook-hosts
+.claude/skills/manage-handbook-hosts
+{{ end -}}

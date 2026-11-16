@@ -15,6 +15,8 @@
 
 {{- $handbook_updater_checkout := or (get . "handbook_updater_checkout") "" -}}
 
+{{- $agent_tools_repository := or (get . "agent_tools_repository") "" -}}
+
 [data]
   agent_name = {{ $agent_name | quote }}
   agent_email = {{ $agent_email | quote }}
@@ -25,6 +27,7 @@
   op_telegram_item = {{ $op_telegram_item | quote }}
   dotfiles_branch = {{ $dotfiles_branch | quote }}
   handbook_updater_checkout = {{ $handbook_updater_checkout | quote }}
+  agent_tools_repository = {{ $agent_tools_repository | quote }}
 
 [onepassword]
   mode = "service"

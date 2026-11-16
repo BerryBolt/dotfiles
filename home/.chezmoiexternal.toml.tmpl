@@ -1,0 +1,12 @@
+{{ $repository := get . "agent_tools_repository" -}}
+{{ if $repository -}}
+{{ if not (regexMatch "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" $repository) -}}
+{{ fail "agent_tools_repository must name owner/repository" -}}
+{{ end -}}
+["code/{{ $repository }}"]
+    type = "git-repo"
+    url = "git@github.com:{{ $repository }}.git"
+    refreshPeriod = "0"
+    ["code/{{ $repository }}".pull]
+        args = ["--ff-only"]
+{{ end -}}

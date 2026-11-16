@@ -147,3 +147,10 @@ Repository instructions require reviewing and signing commits, pushing their exp
 ### Fresh workspace registration
 
 The initial apply omits the repository synchronization job while the workspace checkout is absent. After cloning the workspace, the installer reapplies the setup to register that job and restore the workspace links. Ordinary reapply registers the job when the workspace exists. This ordering satisfies the scheduler requirement that its working directory exist at registration time.
+
+## Optional shared skills
+
+`data.agent_tools_repository` enables a Git source checkout and managed Codex and Claude links
+to its handbook host-management skill. The external checkout has no automatic refresh. The
+configuration template preserves the optional value. This setup starts no update or scheduler.
+See [shared agent skills](runbooks/agent-tools.md).
