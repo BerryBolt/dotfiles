@@ -114,7 +114,9 @@ Acceptance testing installs a pushed candidate from the public GitHub repository
 
 Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. The detector fetches dirty checkouts, inventories unpublished work, and bounds publication repair by repository. Setup apply requires the saved dotfiles branch and its matching `origin` upstream. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
 
-## Hermes updates
+## Agent updates
+
+Codex and Claude update daily through mise. Chezmoi manages the script and its Hermes schedule. See [agent CLI updates](runbooks/update-agent-clis.md) for manual checks, logs, and failure recovery.
 
 Hermes stays at the release that apply script 50 pins. Do not run `hermes update`. A monthly Hermes job sends a Telegram notice when a newer stable release exists. Follow [the Hermes update runbook](runbooks/update-hermes.md) from a terminal session on the workstation.
 
