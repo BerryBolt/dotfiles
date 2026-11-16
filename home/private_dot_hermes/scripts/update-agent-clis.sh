@@ -2,7 +2,9 @@
 # Update Omarchy's agent CLIs. Hermes sends stdout to Telegram.
 set -euo pipefail
 umask 077
+exec </dev/null
 export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin:$PATH"
+export MISE_YES=1
 unset OP_SERVICE_ACCOUNT_TOKEN OP_VAULT OP_FORMAT CODEX_API_KEY OPENAI_API_KEY
 cd "$HOME"
 
@@ -13,36 +15,47 @@ flock -n 9 || { echo 'CLI update failed: another update is running.' >&2; exit 1
 
 # Keep package output local. A failed command still fails the Hermes job.
 exec 3>&1 >"$state/last-run.log" 2>&1
+step='starting the update'
 finish() {
     result=$?
     if [ "$result" -ne 0 ]; then
         printf 'Failed with exit %s at %s\n' "$result" "$(date -Is)"
-        printf 'CLI update failed (exit %s). Read %s/last-run.log.\n' "$result" "$state" >&3
+        printf 'CLI update failed while %s (exit %s). Read %s/last-run.log.\n' "$step" "$result" "$state" >&3
     fi
 }
 trap finish EXIT
 printf 'Started at %s\n' "$(date -Is)"
 
 # The launchers register missing tools through Omarchy's installation route.
-# They also set the same release-age policy as an interactive launch.
+step='starting Codex through Omarchy'
 codex --version
+step='starting Claude through Omarchy'
 claude --version
+# Omarchy 4.0.6 sets this inside each launcher. Child exports do not reach us.
 export MISE_MINIMUM_RELEASE_AGE=0
-mise upgrade --yes --global --no-prune codex claude </dev/null
+step='upgrading Codex and Claude with mise'
+mise upgrade --yes --global --no-prune codex claude
 
+step='checking the updated Codex version'
 codex_version="$(codex --version)"
+step='checking the updated Claude version'
 claude_version="$(claude --version)"
 versions="$(printf '%s\n%s' "$codex_version" "$claude_version")"
 printf '%s\n' "$versions"
-printf 'Succeeded at %s\n' "$(date -Is)"
+
+# Mise retains versions used by running processes or tracked configurations.
+step='removing unused Codex and Claude installations'
+mise prune --yes --tools codex claude
 
 # Compare with the last successful check, including any launcher updates.
+step='saving the successful check'
 previous=''
 if [ -f "$state/versions" ]; then
     previous="$(cat "$state/versions")"
 fi
 printf '%s\n' "$versions" >"$state/versions.next"
 mv "$state/versions.next" "$state/versions"
+printf 'Succeeded at %s\n' "$(date -Is)"
 if [ "$versions" != "$previous" ]; then
     printf 'Agent CLI versions on %s:\n%s\n' "$(hostname)" "$versions" >&3
 fi
