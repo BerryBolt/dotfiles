@@ -120,6 +120,15 @@ check "restored env file is 0600 in a 0700 directory" \
 check "op works again through with-op" \
   bash -c 'with-op op whoami | grep -q "\"SERVICE_ACCOUNT\""'
 
+echo "Missing CLI update script"
+update_script="$HOME/.hermes/scripts/update-agent-clis.sh"
+cp "$update_script" "$WORK/update-agent-clis.sh"
+rm "$update_script"
+check "reapply restores the deleted CLI update script" \
+  chezmoi-with-op apply --no-tty --force --exclude=scripts "$update_script"
+check "the restored CLI update script matches its previous content" \
+  cmp "$WORK/update-agent-clis.sh" "$update_script"
+
 echo "Final state"
 check "reapply succeeds without a supplied token" reapply
 retry_installer() {
