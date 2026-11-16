@@ -110,11 +110,6 @@ To link this workstation from the owner's T3 Code desktop app, follow [Link T3 C
 
 Acceptance testing installs a pushed candidate from the public GitHub repository on a disposable Omarchy VM. Supply `OP_SERVICE_ACCOUNT_TOKEN` through ignored local configuration and use [tests/.env.local.example](tests/.env.local.example) for the remaining input names. Actual tokens, vault/account values, VM addresses, logins, and private platform records are local operational inputs.
 
-## Shared agent skills
-
-An optional source repository supplies the handbook host-management skill to Codex and Claude.
-See [shared agent skills](runbooks/agent-tools.md). This setup starts no host updates.
-
 ## Repository synchronization
 
 Run `hermes cron run sync-brain-and-dotfiles` to trigger synchronization through Hermes and retain its run history. Use `sync-brain-and-dotfiles` directly during recovery to fast-forward the workspace and dotfiles independently and apply changed setup. Apply also registers a Hermes job every five minutes that wakes repair only when needed. The detector fetches dirty checkouts, inventories unpublished work, and bounds publication repair by repository. Setup apply requires the saved dotfiles branch and its matching `origin` upstream. See [skip, retry, and configuration reload behavior](runbooks/sync-brain-and-dotfiles.md).
