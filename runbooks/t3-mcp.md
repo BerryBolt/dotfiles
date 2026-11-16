@@ -13,16 +13,18 @@ T3 Code issues the token through OAuth. The agent approves it on this machine wi
    ```
 
    It prints an authorize URL for `http://127.0.0.1:3773/oauth/mcp/authorize`.
-2. Issue a pairing code limited to the MCP scopes:
+2. Issue a pairing code with the scopes of T3 Code's `full-access` client level:
 
    ```bash
-   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --ttl 5m --label hermes-mcp-approval --json
+   t3 auth pairing create --scope orchestration:read --scope orchestration:operate --scope settings:write --scope source-control:write --ttl 5m --label hermes-mcp-approval --json
    ```
 
-3. POST to `http://127.0.0.1:3773/oauth/mcp/decision` with JSON. Set `authorization` to the authorize URL's query parameters (`response_type`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method`, `state`, `resource`). Set `decision` to `{"_tag": "pairing-code", "access": "auto", "code": <the pairing credential>}`.
+3. POST to `http://127.0.0.1:3773/oauth/mcp/decision` with JSON. Set `authorization` to the authorize URL's query parameters (`response_type`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method`, `state`, `resource`). Set `decision` to `{"_tag": "pairing-code", "access": "full-access", "code": <the pairing credential>}`. The agent's threads run in full-access mode, and T3 Code refuses to settle them from a client with a lower level.
 4. Request the `redirectTo` URL from the response. It is Hermes' loopback callback, and the login prints `Authenticated`.
 
-Keep the pairing credential and the token out of logs. The pairing code is single use.
+Keep the pairing credential and the token out of logs. The pairing code is single use. After a new approval, revoke the previous `Hermes Agent` client session listed by `t3 auth session list`.
+
+A running gateway picks up the new token. If the server was parked before its first token, the gateway can reconnect without registering the tools, so check that `gateway.log` shows `registered 4 tool(s)` for `t3-code`, and restart the gateway if it doesn't.
 
 ## Renewal
 
