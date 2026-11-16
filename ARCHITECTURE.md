@@ -123,6 +123,8 @@ Apply script 83 registers a daily CLI update without a model call. Chezmoi owns 
 
 Apply script 84 registers the `open-work` job every ten minutes. Its pre-check script lists the agent's open pull requests and unsettled T3 Code threads, and wakes the agent only when one needs attention. It reads T3 Code through the `t3-code` MCP server that the Hermes config declares. The agent approves that server's OAuth token, which lasts 30 days. See [T3 Code MCP for Hermes](runbooks/t3-mcp.md).
 
+The selected Telegram item can declare an optional `open-work topic ID`. Apply renders it into the private Hermes `.env`, and script 84 registers delivery to that topic in the owner's home chat. Reapply and a fresh registration restore the same route from 1Password. An absent or empty field selects default Telegram delivery, and an invalid topic ID stops apply.
+
 An optional `handbook_updater_checkout` data value registers a repository-owned release check. Dotfiles manages its Hermes script wrapper and job registration. An empty value leaves the integration unconfigured. See [scheduled handbook release](runbooks/handbook-release.md).
 
 ## Validation

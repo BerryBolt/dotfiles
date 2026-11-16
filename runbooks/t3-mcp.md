@@ -42,3 +42,7 @@ The pre-check is recoverable by design:
 - Apply script 60 retries a refused gateway restart every minute until it succeeds. After two hours it writes `~/.hermes/state/gateway-restart-pending`, which becomes a maintenance item. Find the session that stays live, let it finish or stop it deliberately, and restart the gateway.
 
 Check it with `hermes cron list` and `hermes cron run open-work`.
+
+To route reports to a topic in the owner's chat, set the optional `open-work topic ID` text field on the selected Telegram bot item in 1Password to a positive integer. Apply renders it as `OPEN_WORK_TELEGRAM_TOPIC_ID` in the private `~/.hermes/.env`. Script 84 combines it with `TELEGRAM_HOME_CHANNEL` to register `telegram:<owner-chat>:<topic>`. Reapply repairs delivery drift and preserves a paused job. A rebuilt account restores the route from 1Password without needing the old cron database. Keep chat and topic IDs out of public source.
+
+If the field is absent or empty, apply clears the local topic selection and registers `telegram`, which uses Hermes' default destination. An invalid topic value stops apply.

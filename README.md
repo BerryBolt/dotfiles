@@ -20,6 +20,8 @@ Read [VISION.md](VISION.md) for scope and [ARCHITECTURE.md](ARCHITECTURE.md) for
 - A `Telegram Bot - API key` API Credential item in that vault, with the bot token (`credential`) and the owner's Telegram user ID (`owner user ID`). An optional `other user IDs` field lists more Telegram user IDs that can talk to the bot, comma-separated. Apply writes these into Hermes' settings. Set `CHEZMOI_OP_TELEGRAM_ITEM` to select another item by title or ID, such as a separate test bot. The installer saves this choice for reapply and future installer runs.
 - A `Brave Search - API key` API Credential item in that vault, with a Brave Search API key (`credential`). Hermes uses it for web search.
 
+The Telegram item can also hold an optional `open-work topic ID` text field for scheduled open-work reports in the owner's chat. Reapply and restoration read that selection from 1Password. See [open-work delivery](runbooks/t3-mcp.md#the-open-work-job).
+
 See [the 1Password setup procedure](skills/1password-setup/SKILL.md) for account preparation.
 
 Claude Code works from the token item. Codex needs two device logins that 1Password cannot hold, one for the CLI and one for Hermes: an attended install signs in whichever is missing and the owner approves each code with the ChatGPT subscription; an unattended install names the missing ones (see [Runtime sign-ins](policies/credentials.md#runtime-sign-ins)).

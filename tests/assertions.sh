@@ -402,7 +402,12 @@ job = jobs[0]
 assert job.get("script") == "open-work.py"
 assert job.get("no_agent") is False
 assert job.get("schedule", {}).get("expr") == "*/10 * * * *"
-assert job.get("deliver") == "telegram"
+from pathlib import Path
+from dotenv import dotenv_values
+env = dotenv_values(Path.home() / ".hermes/.env", interpolate=False)
+topic = env.get("OPEN_WORK_TELEGRAM_TOPIC_ID", "")
+expected = "telegram:{}:{}".format(env["TELEGRAM_HOME_CHANNEL"], topic) if topic else "telegram"
+assert job.get("deliver") == expected, "Open-work delivery differs from private configuration"
 assert "mcp-t3-code" in job.get("enabled_toolsets", [])
 server = load_config()["mcp_servers"]["t3-code"]
 assert server["url"] == "http://127.0.0.1:3773/mcp" and server["auth"] == "oauth"

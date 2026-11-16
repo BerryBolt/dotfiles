@@ -5,15 +5,27 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 hermes-python <<'PY'
 from pathlib import Path
+import re
+
+from dotenv import dotenv_values
 
 from cron.jobs import create_job, list_jobs, update_job
+
+env = dotenv_values(Path.home() / '.hermes/.env', interpolate=False)
+topic = env.get('OPEN_WORK_TELEGRAM_TOPIC_ID', '')
+deliver = 'telegram'
+if topic:
+    owner = env.get('TELEGRAM_HOME_CHANNEL', '')
+    if not re.fullmatch(r'[1-9][0-9]*', topic) or not re.fullmatch(r'-?[1-9][0-9]*', owner):
+        raise RuntimeError('Open-work topic delivery requires a positive topic ID and a numeric home chat')
+    deliver = f'telegram:{owner}:{topic}'
 
 name = 'open-work'
 schedule = '*/10 * * * *'
 fields = dict(
     prompt='Follow ~/brain/routines/open-work.md for the items below.',
     script='open-work.py',
-    deliver='telegram',
+    deliver=deliver,
     workdir=str(Path.home() / 'brain'),
     enabled_toolsets=['terminal', 'file', 'skills', 'mcp-t3-code'],
     # Each run sees its last report, so unchanged blockers aren't repeated.

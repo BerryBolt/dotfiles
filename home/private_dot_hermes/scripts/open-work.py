@@ -238,7 +238,7 @@ def maintenance_items(token_file):
     if os.path.exists(RESTART_PENDING):
         since = open(RESTART_PENDING).read().strip()
         items["maint:gateway-restart"] = (["pending", since], {
-            "kind": "maintenance", "id": "Hermes gateway restart",
+            "kind": "maintenance", "id": "Pending Hermes configuration",
             "reason": f"a configuration change has waited since {since} for the gateway to restart; "
                       "Hermes refuses while sessions are live. Find what keeps them live, then restart it",
         })
