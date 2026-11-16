@@ -121,6 +121,8 @@ Apply also registers a monthly Hermes release check. The job runs `~/.hermes/scr
 
 Apply script 83 registers a daily CLI update without a model call. Chezmoi owns `~/.hermes/scripts/update-agent-clis.sh`. The script upgrades Codex and Claude through mise and retains previous installations for running sessions. It records the latest check under `~/.local/state/agent-cli-updates`, or under `XDG_STATE_HOME` when set. Hermes sends the first version report, later version changes, and failures to Telegram. Reapply corrects the job definition and preserves a pause. See [agent CLI updates](runbooks/update-agent-clis.md).
 
+Apply script 84 registers the `open-work` job every ten minutes. Its pre-check script lists the agent's open pull requests and unsettled T3 Code threads, and wakes the agent only when one needs attention. It reads T3 Code through the `t3-code` MCP server that the Hermes config declares. The agent approves that server's OAuth token, which lasts 30 days. See [T3 Code MCP for Hermes](runbooks/t3-mcp.md).
+
 An optional `handbook_updater_checkout` data value registers a repository-owned release check. Dotfiles manages its Hermes script wrapper and job registration. An empty value leaves the integration unconfigured. See [scheduled handbook release](runbooks/handbook-release.md).
 
 ## Validation

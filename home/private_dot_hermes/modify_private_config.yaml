@@ -35,6 +35,17 @@
 {{- /* Web search through Brave's free plan; the key is in ~/.hermes/.env. */ -}}
 {{- $declared = set $declared "web.backend" "brave-free" -}}
 {{- $declared = set $declared "browser.cloud_provider" "local" -}}
+{{- /* T3 Code's MCP server, so Hermes can list, settle, and snooze threads,
+       which the t3 CLI cannot. Leaf keys only: Hermes may add more under
+       the entry. The OAuth token is runtime state; runbooks/t3-mcp.md says
+       how to approve it. */ -}}
+{{- $declared = set $declared "mcp_servers.t3-code.url" "http://127.0.0.1:3773/mcp" -}}
+{{- $declared = set $declared "mcp_servers.t3-code.auth" "oauth" -}}
+{{- /* Only the tools the open-work routine needs, to keep prompts small.
+       The t3 CLI still starts and messages threads. */ -}}
+{{- $declared = set $declared "mcp_servers.t3-code.tools.include" (list "t3_project_list" "t3_thread_list" "t3_thread_read" "t3_thread_organize") -}}
+{{- $declared = set $declared "mcp_servers.t3-code.tools.resources" false -}}
+{{- $declared = set $declared "mcp_servers.t3-code.tools.prompts" false -}}
 {{- /* The browser vault reads 1Password through with-op, which loads the token
        for each call, so the token stays out of Hermes' process. Hermes treats
        the backend as locked until the variable named here is set, so it names

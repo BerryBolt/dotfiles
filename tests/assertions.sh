@@ -392,6 +392,24 @@ PYTHON
 check "the Hermes release check reads the pin and Hermes' release tags" \
   bash "$HOME/.hermes/scripts/hermes-release-check.sh"
 
+check "Hermes has one open-work job with T3 Code MCP access" bash -c '
+  hermes-python <<"PYTHON"
+from cron.jobs import list_jobs
+from hermes_cli.config import load_config
+jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "open-work"]
+assert len(jobs) == 1
+job = jobs[0]
+assert job.get("script") == "open-work.py"
+assert job.get("no_agent") is False
+assert job.get("schedule", {}).get("expr") == "*/10 * * * *"
+assert job.get("deliver") == "telegram"
+assert "mcp-t3-code" in job.get("enabled_toolsets", [])
+server = load_config()["mcp_servers"]["t3-code"]
+assert server["url"] == "http://127.0.0.1:3773/mcp" and server["auth"] == "oauth"
+PYTHON
+'
+check "the T3 Code MCP server accepts Hermes' token" hermes mcp test t3-code
+
 check "Hermes has one daily CLI update job without a model call" bash -c '
   hermes-python <<"PYTHON"
 from cron.jobs import list_jobs
