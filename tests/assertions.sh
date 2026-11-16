@@ -392,6 +392,21 @@ PYTHON
 check "the Hermes release check reads the pin and Hermes' release tags" \
   bash "$HOME/.hermes/scripts/hermes-release-check.sh"
 
+check "Hermes has one daily CLI update job without a model call" bash -c '
+  hermes-python <<"PYTHON"
+from cron.jobs import list_jobs
+from pathlib import Path
+jobs = [j for j in list_jobs(include_disabled=True) if j.get("name") == "update-agent-clis"]
+assert len(jobs) == 1
+job = jobs[0]
+assert job.get("no_agent") is True
+assert job.get("script") == "update-agent-clis.sh"
+assert job.get("schedule", {}).get("expr") == "15 9 * * *"
+assert job.get("deliver") == "telegram"
+assert (Path.home() / ".hermes/scripts/update-agent-clis.sh").is_file()
+PYTHON
+'
+
 echo ""
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
