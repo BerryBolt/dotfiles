@@ -29,17 +29,24 @@ systemctl --user enable --quiet "$service"
 if systemctl --user is-active --quiet "$service"; then
     # Hermes refuses to restart while any session is live, and an apply from
     # the sync job is itself a live cron session. Retry in the background each
-    # minute, for up to two hours, while Hermes reports live sessions, so the
-    # turn that started this apply can finish first.
+    # minute while Hermes reports live sessions, so the turn that started this
+    # apply can finish first. After two hours, leave a marker that the
+    # open-work job reports (runbooks/t3-mcp.md); success removes it.
     # shellcheck disable=SC2016  # expanded by the background shell
     systemd-run --user --collect --quiet --setenv=PATH="$PATH" bash -c '
-        for _ in $(seq 120); do
-            if out=$(hermes gateway restart </dev/null 2>&1); then exit 0; fi
+        marker="$HOME/.hermes/state/gateway-restart-pending"
+        start=$(date +%s)
+        while true; do
+            if out=$(hermes gateway restart </dev/null 2>&1); then
+                rm -f "$marker"
+                exit 0
+            fi
             grep -q "Refusing to restart" <<<"$out" || { printf "%s\n" "$out" >&2; exit 1; }
+            if [ $(( $(date +%s) - start )) -ge 7200 ] && [ ! -e "$marker" ]; then
+                date -Iseconds -d "@$start" > "$marker"
+            fi
             sleep 60
-        done
-        echo "Hermes gateway restart still refused after two hours" >&2
-        exit 1'
+        done'
     echo "The Hermes gateway restarts once no session is live."
 else
     hermes gateway start

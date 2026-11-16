@@ -11,6 +11,7 @@
 
 {{ if not (stat (joinPath .chezmoi.homeDir "brain/.git")) -}}
 .chezmoiscripts/*sync-brain-and-dotfiles.sh
+.chezmoiscripts/*open-work.sh
 {{ end -}}
 
 {{ if not (get . "handbook_updater_checkout") -}}

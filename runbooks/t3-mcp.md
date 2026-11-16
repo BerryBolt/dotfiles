@@ -32,6 +32,13 @@ The token lasts 30 days, and T3 Code offers no refresh grant. Hermes keeps it in
 
 ## The open-work job
 
-Apply script 84 registers the `open-work` job every ten minutes. Its pre-check, `~/.hermes/scripts/open-work.py`, reads unsettled T3 threads over MCP and the agent's open pull requests through `gh`. It saves what it saw in `~/.hermes/state/open-work.json` and wakes the agent only for new, changed, stalled, or long-unresolved items. The agent then follows `~/brain/routines/open-work.md` and reports to Telegram.
+Apply script 84 registers the `open-work` job every ten minutes, once the workspace checkout exists. Its pre-check, `~/.hermes/scripts/open-work.py`, reads unsettled T3 threads over MCP and the agent's open pull requests through `gh`. It fingerprints each pull request's head, checks, review state, and other people's comments, inline comments, and reviews, including edits. It saves what it saw in `~/.hermes/state/open-work.json` and wakes the agent only for new, changed, stalled, or long-unresolved items. The agent then follows `~/brain/routines/open-work.md` and reports to Telegram. Each run sees the job's previous report.
+
+The pre-check is recoverable by design:
+
+- T3 Code and GitHub are separate sources. When one fails, the other still runs, and the failing source's items keep their last state. A source that fails three runs in a row becomes a maintenance item. A missing token counts as a failing T3 source.
+- When the agent run fails after a wake, the next three runs wake it again for the same items.
+- A GitHub search that reaches its 1,000-result limit fails the source rather than miss work.
+- Apply script 60 retries a refused gateway restart every minute until it succeeds. After two hours it writes `~/.hermes/state/gateway-restart-pending`, which becomes a maintenance item. Find the session that stays live, let it finish or stop it deliberately, and restart the gateway.
 
 Check it with `hermes cron list` and `hermes cron run open-work`.

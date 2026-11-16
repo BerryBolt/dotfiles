@@ -16,6 +16,8 @@ fields = dict(
     deliver='telegram',
     workdir=str(Path.home() / 'brain'),
     enabled_toolsets=['terminal', 'file', 'skills', 'mcp-t3-code'],
+    # Each run sees its last report, so unchanged blockers aren't repeated.
+    context_from=['self'],
 )
 matches = [j for j in list_jobs(include_disabled=True) if j.get('name') == name]
 if len(matches) > 1:
