@@ -12,7 +12,7 @@ The first successful check sends both versions to Telegram. Later checks send a 
 
 1. Run `hermes cron list` to find the job and its next run.
 2. Run `hermes cron run update-agent-clis` to request a check.
-3. Run `hermes cron runs update-agent-clis --limit 5` to inspect completion and delivery.
+3. Run `hermes cron runs <job-id> --limit 5` with the ID from the list to inspect completion and delivery.
 4. Read `~/.local/state/agent-cli-updates/last-run.log` for the latest command output and versions.
 
 If `XDG_STATE_HOME` is set, the log is under `$XDG_STATE_HOME/agent-cli-updates` instead. The same directory holds the last successful versions and the update lock. These files are runtime state and stay outside Git. Hermes retains its own run history, including silent checks.
