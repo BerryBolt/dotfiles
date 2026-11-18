@@ -32,7 +32,7 @@ The token lasts 30 days, and T3 Code offers no refresh grant. Hermes keeps it in
 
 ## The open-work job
 
-Apply script 84 registers the `open-work` job every ten minutes, once the workspace checkout exists. Its pre-check, `~/.hermes/scripts/open-work.py`, reads unsettled T3 threads over MCP and the agent's open pull requests through `gh`. It fingerprints each pull request's head, checks, review state, and other people's comments, inline comments, and reviews, including edits. It saves what it saw in `~/.hermes/state/open-work.json` and wakes the agent only for new, changed, stalled, or long-unresolved items. The agent then follows `~/brain/routines/open-work.md` and reports to Telegram. Each run sees the job's previous report.
+Apply script 84 registers the `open-work` job every ten minutes, once the workspace checkout exists. Its pre-check, `~/.hermes/scripts/open-work.py`, reads unsettled T3 threads over MCP and queries GitHub through `gh`. It checks open issues assigned to the agent, open pull requests authored by or assigned to the agent, and direct requests for its review. It fingerprints each pull request's head, checks, review state, and other people's comments, inline comments, and reviews, including edits. It tracks issue updates and the latest direct review request, including a new request on the same commit. It saves what it saw in `~/.hermes/state/open-work.json` and wakes the agent only for new, changed, stalled, or long-unresolved items. The agent then follows `~/brain/routines/open-work.md` and reports to Telegram. Each run sees the job's previous report.
 
 The pre-check is recoverable by design:
 

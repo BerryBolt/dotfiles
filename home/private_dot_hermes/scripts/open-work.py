@@ -1,7 +1,7 @@
 """Pre-check for the open-work job: wake the agent only when owned work needs it.
 
-Open work is every open GitHub pull request authored by or assigned to the
-signed-in account, and every T3 Code thread that is not settled. A thread that
+Open work includes assigned GitHub issues, authored or assigned pull requests,
+direct review requests, and unsettled T3 Code threads. A thread that
 is done should be settled, so an unsettled thread that is not running needs a
 decision. A snoozed thread needs none until its snooze ends. The script
 compares each item with the last run and prints the items that need
@@ -188,18 +188,44 @@ def feedback(repo, number, login):
     return digest(entries), len(entries), latest
 
 
-def pr_items(login):
-    urls = set()
-    for role in ("--author=@me", "--assignee=@me"):
-        found = gh_json("search", "prs", role, "--state=open", f"--limit={SEARCH_LIMIT}", "--json=url")
-        if len(found) >= SEARCH_LIMIT:
-            raise SourceError(f"GitHub search {role} hit its {SEARCH_LIMIT}-result limit; open work may be missing")
-        urls.update(pr["url"] for pr in found)
+def search_open(kind, role, fields):
+    found = gh_json("search", kind, role, "--state=open", f"--limit={SEARCH_LIMIT}", f"--json={fields}")
+    if len(found) >= SEARCH_LIMIT:
+        raise SourceError(f"GitHub search {role} hit its {SEARCH_LIMIT}-result limit; open work may be missing")
+    return found
+
+
+def assigned_issues():
     items = {}
-    fields = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup"
-    for url in sorted(urls):
+    for issue in search_open("issues", "--assignee=@me", "title,url,updatedAt"):
+        url = issue["url"]
+        items["issue:" + url] = (issue["updatedAt"], {
+            "kind": "assigned-issue", "id": url, "title": issue["title"],
+        })
+    return items
+
+
+def latest_review_request(repo, number, login):
+    # A second request can arrive for the same commit between two checks.
+    pages = gh_json("api", "--paginate", "--slurp", f"repos/{repo}/issues/{number}/timeline")
+    return next((event["id"] for page in reversed(pages) for event in reversed(page)
+                 if event.get("event") == "review_requested"
+                 and (event.get("requested_reviewer") or {}).get("login", "").lower() == login.lower()), None)
+
+
+def pr_items(login):
+    roles = {}
+    for role in ("author", "assignee", "review-requested"):
+        for hit in search_open("prs", f"--{role}=@me", "url"):
+            roles.setdefault(hit["url"], []).append(role)
+    items = {}
+    fields = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup,reviewRequests"
+    for url in sorted(roles):
         pr = gh_json("pr", "view", url, f"--json={fields}")
         repo = url.split("github.com/")[1].split("/pull/")[0]
+        requested = any((user.get("login") or "").lower() == login.lower() for user in pr["reviewRequests"])
+        if roles[url] == ["review-requested"] and not requested:
+            continue
         checks = sorted(
             f"{c.get('name') or c.get('context')}={c.get('conclusion') or c.get('state') or c.get('status')}"
             for c in pr["statusCheckRollup"] or []
@@ -219,6 +245,12 @@ def pr_items(login):
             "feedbackFromOthers": feedback_count,
             "latestFeedbackAt": latest,
         }
+        if requested:
+            request_id = latest_review_request(repo, pr["number"], login)
+            fingerprint.append(["review-requested", request_id])
+            detail["reviewRequested"] = True
+            detail["reviewRequestId"] = request_id
+            detail["head"] = pr["headRefOid"]
         items["pr:" + url] = (fingerprint, detail)
     return items
 
@@ -273,7 +305,7 @@ def main():
             raise SourceError("no token; approve the t3-code MCP server with runbooks/t3-mcp.md in dotfiles")
         return thread_items(token_file["access_token"])
 
-    sources = {"t3": t3_source,
+    sources = {"t3": t3_source, "issue": assigned_issues,
                "pr": lambda: pr_items(run("gh", "api", "user", "--jq", ".login").strip())}
     failed_sources = set()
     for name, collect in sources.items():
