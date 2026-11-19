@@ -32,16 +32,16 @@ The token lasts 30 days, and T3 Code offers no refresh grant. Hermes keeps it in
 
 ## The open-work job
 
-Apply script 84 registers the `open-work` job every ten minutes, once the workspace checkout exists. Its pre-check, `~/.hermes/scripts/open-work.py`, reads unsettled T3 threads over MCP and the agent's open pull requests through `gh`. It fingerprints each pull request's head, checks, review state, and other people's comments, inline comments, and reviews, including edits. It saves what it saw in `~/.hermes/state/open-work.json` and wakes the agent only for new, changed, stalled, or long-unresolved items. The agent then follows `~/brain/routines/open-work.md` and reports to Telegram. Each run sees the job's previous report.
+Apply script 84 registers the `open-work` job every ten minutes, once the workspace checkout exists. Its pre-check, `~/.hermes/scripts/open-work.py`, reads unsettled T3 threads over MCP and queries GitHub through `gh`. It checks open issues assigned to the agent, open pull requests authored by or assigned to the agent, and direct requests for its review. It fingerprints each pull request's head, checks, review state, and other people's comments, inline comments, and reviews, including edits. For assigned issues it tracks the assignment, title, body, and other people's comments. For requested reviews it tracks the request and the commit. For issue assignments, pull request assignments, and review requests, it reads `policies/github-pickup.json` from the workspace's last fetched default branch on `origin`. That policy lists the GitHub logins allowed to make these requests under `*` or an exact `owner/repo`. It saves what it saw in `~/.hermes/state/open-work.json` and wakes the agent only for new, changed, stalled, or long-unresolved items. The agent then follows `~/brain/routines/open-work.md` and reports to Telegram. Each run sees the job's previous report.
 
 The pre-check is recoverable by design:
 
 - T3 Code and GitHub are separate sources. When one fails, the other still runs, and the failing source's items keep their last state. A source that fails three runs in a row becomes a maintenance item. A missing token counts as a failing T3 source.
-- When the agent run fails after a wake, the next three runs wake it again for the same items.
+- When the agent run fails or the scheduler records no completion after a wake, the next three runs wake it again for the same items.
 - A GitHub search that reaches its 1,000-result limit fails the source rather than miss work.
 - Apply script 60 retries a refused gateway restart every minute until it succeeds. After two hours it writes `~/.hermes/state/gateway-restart-pending`, which becomes a maintenance item. Find the session that stays live, let it finish or stop it deliberately, and restart the gateway.
 
-Check it with `hermes cron list` and `hermes cron run open-work`.
+Use `hermes cron list` to check registration. To verify automatic pickup, use a repository shared with the test account. Have an authorized requester assign an issue and request a review. Observe the scheduled job, the T3 threads, and the resulting GitHub work. Check the next scheduled run for duplicate work. Request another review of the same commit and verify that the new request starts one review.
 
 To route reports to a topic in the owner's chat, set the optional `open-work topic ID` text field on the selected Telegram bot item in 1Password to a positive integer. Apply renders it as `OPEN_WORK_TELEGRAM_TOPIC_ID` in the private `~/.hermes/.env`. Script 84 combines it with `TELEGRAM_HOME_CHANNEL` to register `telegram:<owner-chat>:<topic>`. Reapply repairs delivery drift and preserves a paused job. A rebuilt account restores the route from 1Password without needing the old cron database. Keep chat and topic IDs out of public source.
 

@@ -1,7 +1,7 @@
 """Pre-check for the open-work job: wake the agent only when owned work needs it.
 
-Open work is every open GitHub pull request authored by or assigned to the
-signed-in account, and every T3 Code thread that is not settled. A thread that
+Open work includes assigned GitHub issues, authored or assigned pull requests,
+direct review requests, and unsettled T3 Code threads. A thread that
 is done should be settled, so an unsettled thread that is not running needs a
 decision. A snoozed thread needs none until its snooze ends. The script
 compares each item with the last run and prints the items that need
@@ -173,6 +173,10 @@ def gh_json(*args):
         raise SourceError(f"gh {' '.join(args[:2])}: invalid JSON: {error}")
 
 
+def github_login(user):
+    return ((user or {}).get("login") or "").casefold()
+
+
 def feedback(repo, number, login):
     """IDs and edit times of other people's comments, inline comments, and reviews."""
     entries = []
@@ -181,45 +185,125 @@ def feedback(repo, number, login):
                         (f"repos/{repo}/pulls/{number}/reviews", "submitted_at")):
         for page in gh_json("api", "--paginate", "--slurp", path):
             for entry in page:
-                if (entry.get("user") or {}).get("login") != login:
+                if github_login(entry.get("user")) != login.casefold():
                     entries.append([entry["id"], entry.get(stamp)])
     entries.sort()
     latest = max((e[1] for e in entries if e[1]), default=None)
     return digest(entries), len(entries), latest
 
 
-def pr_items(login):
-    urls = set()
-    for role in ("--author=@me", "--assignee=@me"):
-        found = gh_json("search", "prs", role, "--state=open", f"--limit={SEARCH_LIMIT}", "--json=url")
-        if len(found) >= SEARCH_LIMIT:
-            raise SourceError(f"GitHub search {role} hit its {SEARCH_LIMIT}-result limit; open work may be missing")
-        urls.update(pr["url"] for pr in found)
+def search_open(kind, role, fields):
+    found = gh_json("search", kind, role, "--state=open", f"--limit={SEARCH_LIMIT}", f"--json={fields}")
+    if len(found) >= SEARCH_LIMIT:
+        raise SourceError(f"GitHub search {role} hit its {SEARCH_LIMIT}-result limit; open work may be missing")
+    return found
+
+
+def request_policy():
+    workspace = os.path.expanduser("~/brain")
+    try:
+        policy = json.loads(run("git", "-C", workspace, "show",
+                                "refs/remotes/origin/HEAD:policies/github-pickup.json"))
+        if not isinstance(policy, dict) or not all(
+                isinstance(users, list) and all(isinstance(user, str) and user for user in users)
+                for users in policy.values()):
+            raise ValueError("expected a mapping of repositories to GitHub logins")
+        return {repo.casefold(): {user.casefold() for user in users} for repo, users in policy.items()}
+    except (OSError, ValueError) as error:
+        raise SourceError(f"Cannot read GitHub pickup policy: {error}")
+
+
+def direct_request(hit, kind, login, allowed):
+    repo, number, url = hit["repository"]["nameWithOwner"], hit["number"], hit["url"]
+    issue = kind == "issue"
+    review = kind == "review"
+    event_type, target = ("review_requested", "requested_reviewer") if review else ("assigned", "assignee")
+    pages = gh_json("api", "--paginate", "--slurp", f"repos/{repo}/issues/{number}/timeline")
+    events = [event for page in pages for event in page]
+    request = next((e for e in reversed(events) if e.get("event") == event_type
+                    and github_login(e.get(target)) == login), None)
+    if not request:
+        return None
+    actor = request.get("review_requester" if review else "assigner") or request.get("actor") or {}
+    requester = github_login(actor)
+    if requester == login or requester not in allowed:
+        return None
+
+    fields = "state,title,assignees,body" if issue else "state,title,reviewRequests,headRefOid"
+    if kind == "assigned-pr":
+        fields = PR_FIELDS + ",state,assignees,author"
+    item = gh_json("issue" if issue else "pr", "view", url, f"--json={fields}")
+    recipients = item["reviewRequests" if review else "assignees"]
+    if item["state"] != "OPEN" or not any(github_login(r) == login for r in recipients):
+        return None
+    if kind == "assigned-pr":
+        if github_login(item.get("author")) == login:
+            return None  # The authored pull request is already tracked.
+        fingerprint, detail = pull_request_item(item, repo, login)
+        detail.update(kind="assigned-pr", requester=requester, requestId=request["id"])
+        return [request["id"], *fingerprint], detail
+    detail = {"kind": "assigned-issue" if issue else "requested-review", "id": url,
+              "title": item["title"], "requester": requester, "requestId": request["id"]}
+    if issue:
+        # Ignore labels, links, and the agent's own comments when deciding whether to wake it.
+        comments = [[e["id"], e["updated_at"]] for e in events if e.get("event") == "commented"
+                    and github_login(e.get("user")) != login]
+        return [request["id"], digest([item["title"], item["body"], comments])], detail
+    detail["head"] = item["headRefOid"]
+    return [request["id"], item["headRefOid"]], detail
+
+
+def requested_items(kind):
+    issue = kind == "issue"
+    role = "--review-requested=@me" if kind == "review" else "--assignee=@me"
+    login = gh_json("api", "user")["login"].casefold()
+    policy = request_policy()
     items = {}
-    fields = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup"
-    for url in sorted(urls):
-        pr = gh_json("pr", "view", url, f"--json={fields}")
-        repo = url.split("github.com/")[1].split("/pull/")[0]
-        checks = sorted(
-            f"{c.get('name') or c.get('context')}={c.get('conclusion') or c.get('state') or c.get('status')}"
-            for c in pr["statusCheckRollup"] or []
-        )
-        feedback_digest, feedback_count, latest = feedback(repo, pr["number"], login)
-        failing = [c for c in checks if c.rsplit("=", 1)[1] in FAILED_CHECKS]
-        fingerprint = [pr["headRefOid"], digest(checks), pr["reviewDecision"], pr["isDraft"],
-                       pr["mergeable"], feedback_digest]
-        detail = {
-            "kind": "pull-request",
-            "id": url,
-            "title": pr["title"],
-            "draft": pr["isDraft"],
-            "reviewDecision": pr["reviewDecision"] or None,
-            "mergeable": pr["mergeable"],
-            "failingChecks": failing or None,
-            "feedbackFromOthers": feedback_count,
-            "latestFeedbackAt": latest,
-        }
-        items["pr:" + url] = (fingerprint, detail)
+    for hit in search_open("issues" if issue else "prs", role, "url,number,repository"):
+        repo = hit["repository"]["nameWithOwner"].casefold()
+        allowed = policy.get("*", set()) | policy.get(repo, set())
+        if allowed:
+            result = direct_request(hit, kind, login, allowed)
+            if result:
+                items[kind + ":" + hit["url"]] = result
+    return items
+
+
+PR_FIELDS = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup"
+
+
+def pull_request_item(pr, repo, login):
+    url = pr["url"]
+    checks = sorted(
+        f"{c.get('name') or c.get('context')}={c.get('conclusion') or c.get('state') or c.get('status')}"
+        for c in pr["statusCheckRollup"] or []
+    )
+    feedback_digest, feedback_count, latest = feedback(repo, pr["number"], login)
+    failing = [c for c in checks if c.rsplit("=", 1)[1] in FAILED_CHECKS]
+    fingerprint = [pr["headRefOid"], digest(checks), pr["reviewDecision"], pr["isDraft"],
+                   pr["mergeable"], feedback_digest]
+    detail = {
+        "kind": "pull-request",
+        "id": url,
+        "title": pr["title"],
+        "draft": pr["isDraft"],
+        "reviewDecision": pr["reviewDecision"] or None,
+        "mergeable": pr["mergeable"],
+        "failingChecks": failing or None,
+        "feedbackFromOthers": feedback_count,
+        "latestFeedbackAt": latest,
+    }
+    return fingerprint, detail
+
+
+def authored_prs():
+    login = gh_json("api", "user")["login"]
+    items = {}
+    for hit in search_open("prs", "--author=@me", "url,repository"):
+        url = hit["url"]
+        pr = gh_json("pr", "view", url, f"--json={PR_FIELDS},state,author")
+        if pr["state"] == "OPEN" and github_login(pr.get("author")) == login.casefold():
+            items["pr:" + url] = pull_request_item(pr, hit["repository"]["nameWithOwner"], login)
     return items
 
 
@@ -245,13 +329,13 @@ def maintenance_items(token_file):
     return items
 
 
-def last_agent_run_failed():
+def last_job_result():
     try:
         jobs = json.load(open(JOBS))["jobs"]
     except (OSError, ValueError, KeyError):
-        return False
+        return {}
     job = next((j for j in jobs if j.get("name") == JOB_NAME), None)
-    return bool(job) and job.get("last_status") == "error"
+    return job or {}
 
 
 def main():
@@ -273,8 +357,9 @@ def main():
             raise SourceError("no token; approve the t3-code MCP server with runbooks/t3-mcp.md in dotfiles")
         return thread_items(token_file["access_token"])
 
-    sources = {"t3": t3_source,
-               "pr": lambda: pr_items(run("gh", "api", "user", "--jq", ".login").strip())}
+    sources = {"t3": t3_source, "issue": lambda: requested_items("issue"),
+               "review": lambda: requested_items("review"),
+               "assigned-pr": lambda: requested_items("assigned-pr"), "pr": authored_prs}
     failed_sources = set()
     for name, collect in sources.items():
         try:
@@ -293,7 +378,11 @@ def main():
     now = time.time()
     retry = set()
     retries = meta.get("agentRetries", 0)
-    if meta.get("lastWake") and last_agent_run_failed() and retries < AGENT_RETRIES:
+    job = last_job_result()
+    completed = job.get("last_run_at")
+    # A hard stop can leave the previous completion in the scheduler's record.
+    interrupted = "last_run_at" in job and "completionBeforeWake" in meta and completed == meta["completionBeforeWake"]
+    if meta.get("lastWake") and (job.get("last_status") == "error" or interrupted) and retries < AGENT_RETRIES:
         retry = set(meta["lastWake"])
         retries += 1
     else:
@@ -303,13 +392,15 @@ def main():
     for key, last in previous.items():
         # A failing source keeps its items' state until it answers again.
         if key.split(":", 1)[0] in failed_sources and key not in items:
+            if key in retry:
+                last["retryAfterRecovery"] = True
             state[key] = last
     for key, (fingerprint, detail) in items.items():
         last = previous.get(key)
         if last is None or last["fingerprint"] != fingerprint:
             detail["change"] = "new" if last is None else "changed"
-        elif key in retry:
-            detail["change"] = "retry: the previous agent run failed"
+        elif key in retry or last.get("retryAfterRecovery"):
+            detail["change"] = "retry: the previous wake has no successful completion"
         elif now - last["woke"] >= REMIND_HOURS * 3600:
             detail["change"] = f"unchanged for {REMIND_HOURS}+ hours"
         else:
@@ -321,6 +412,8 @@ def main():
     woken = [key for key, value in state.items() if value.get("woke") == now]
     state["_meta"] = {"sourceFailures": failures, "lastWake": woken,
                       "agentRetries": retries if woken else 0}
+    if "last_run_at" in job:
+        state["_meta"]["completionBeforeWake"] = completed
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
     with open(STATE + ".tmp", "w") as handle:
         json.dump(state, handle, indent=1)

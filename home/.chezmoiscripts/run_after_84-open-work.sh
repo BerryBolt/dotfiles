@@ -1,6 +1,6 @@
 #!/bin/bash
-# Register the open-work job. Its pre-check wakes the agent only when an open
-# pull request or unsettled T3 thread needs it. See runbooks/t3-mcp.md.
+# Register the open-work job. Its pre-check wakes the agent when GitHub work
+# or an unsettled T3 thread needs attention. See runbooks/t3-mcp.md.
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 hermes-python <<'PY'
