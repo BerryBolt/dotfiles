@@ -195,37 +195,75 @@ def search_open(kind, role, fields):
     return found
 
 
-def assigned_issues():
+def request_policy():
+    path = os.path.expanduser("~/brain/policies/github-pickup.json")
+    try:
+        policy = json.load(open(path))
+        if not isinstance(policy, dict) or not all(
+                isinstance(users, list) and all(isinstance(user, str) and user for user in users)
+                for users in policy.values()):
+            raise ValueError("expected a mapping of repositories to GitHub logins")
+        return {repo.casefold(): {user.casefold() for user in users} for repo, users in policy.items()}
+    except (OSError, ValueError) as error:
+        raise SourceError(f"Cannot read GitHub pickup policy: {error}")
+
+
+def direct_request(hit, kind, login, allowed):
+    repo, number, url = hit["repository"]["nameWithOwner"], hit["number"], hit["url"]
+    issue = kind == "issue"
+    event_type, target = ("assigned", "assignee") if issue else ("review_requested", "requested_reviewer")
+    pages = gh_json("api", "--paginate", "--slurp", f"repos/{repo}/issues/{number}/timeline")
+    events = [event for page in pages for event in page]
+    request = next((e for e in reversed(events) if e.get("event") == event_type
+                    and (e.get(target) or {}).get("login", "").casefold() == login), None)
+    if not request:
+        return None
+    actor = request.get("assigner" if issue else "review_requester") or request.get("actor") or {}
+    requester = actor.get("login", "").casefold()
+    if requester == login or requester not in allowed:
+        return None
+
+    fields = "state,title,assignees,body" if issue else "state,title,reviewRequests,headRefOid"
+    item = gh_json("issue" if issue else "pr", "view", url, f"--json={fields}")
+    recipients = item["assignees" if issue else "reviewRequests"]
+    if item["state"] != "OPEN" or not any((r.get("login") or "").casefold() == login for r in recipients):
+        return None
+    detail = {"kind": "assigned-issue" if issue else "requested-review", "id": url,
+              "title": item["title"], "requester": requester, "requestId": request["id"]}
+    if issue:
+        # Ignore labels, links, and the agent's own comments when deciding whether to wake it.
+        comments = [[e["id"], e["updated_at"]] for e in events if e.get("event") == "commented"
+                    and (e.get("user") or {}).get("login", "").casefold() != login]
+        return [request["id"], digest([item["title"], item["body"], comments])], detail
+    detail["head"] = item["headRefOid"]
+    return [request["id"], item["headRefOid"]], detail
+
+
+def requested_items(kind):
+    issue = kind == "issue"
+    role = "--assignee=@me" if issue else "--review-requested=@me"
+    login = gh_json("api", "user")["login"].casefold()
+    policy = request_policy()
     items = {}
-    for issue in search_open("issues", "--assignee=@me", "title,url,updatedAt"):
-        url = issue["url"]
-        items["issue:" + url] = (issue["updatedAt"], {
-            "kind": "assigned-issue", "id": url, "title": issue["title"],
-        })
+    for hit in search_open("issues" if issue else "prs", role, "url,number,repository"):
+        repo = hit["repository"]["nameWithOwner"].casefold()
+        allowed = policy.get("*", set()) | policy.get(repo, set())
+        if allowed:
+            result = direct_request(hit, kind, login, allowed)
+            if result:
+                items[kind + ":" + hit["url"]] = result
     return items
 
 
-def latest_review_request(repo, number, login):
-    # A second request can arrive for the same commit between two checks.
-    pages = gh_json("api", "--paginate", "--slurp", f"repos/{repo}/issues/{number}/timeline")
-    return next((event["id"] for page in reversed(pages) for event in reversed(page)
-                 if event.get("event") == "review_requested"
-                 and (event.get("requested_reviewer") or {}).get("login", "").lower() == login.lower()), None)
-
-
 def pr_items(login):
-    roles = {}
-    for role in ("author", "assignee", "review-requested"):
-        for hit in search_open("prs", f"--{role}=@me", "url"):
-            roles.setdefault(hit["url"], []).append(role)
+    urls = set()
+    for role in ("author", "assignee"):
+        urls.update(hit["url"] for hit in search_open("prs", f"--{role}=@me", "url"))
     items = {}
-    fields = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup,reviewRequests"
-    for url in sorted(roles):
+    fields = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup"
+    for url in sorted(urls):
         pr = gh_json("pr", "view", url, f"--json={fields}")
         repo = url.split("github.com/")[1].split("/pull/")[0]
-        requested = any((user.get("login") or "").lower() == login.lower() for user in pr["reviewRequests"])
-        if roles[url] == ["review-requested"] and not requested:
-            continue
         checks = sorted(
             f"{c.get('name') or c.get('context')}={c.get('conclusion') or c.get('state') or c.get('status')}"
             for c in pr["statusCheckRollup"] or []
@@ -245,12 +283,6 @@ def pr_items(login):
             "feedbackFromOthers": feedback_count,
             "latestFeedbackAt": latest,
         }
-        if requested:
-            request_id = latest_review_request(repo, pr["number"], login)
-            fingerprint.append(["review-requested", request_id])
-            detail["reviewRequested"] = True
-            detail["reviewRequestId"] = request_id
-            detail["head"] = pr["headRefOid"]
         items["pr:" + url] = (fingerprint, detail)
     return items
 
@@ -277,13 +309,13 @@ def maintenance_items(token_file):
     return items
 
 
-def last_agent_run_failed():
+def last_job_result():
     try:
         jobs = json.load(open(JOBS))["jobs"]
     except (OSError, ValueError, KeyError):
-        return False
+        return {}
     job = next((j for j in jobs if j.get("name") == JOB_NAME), None)
-    return bool(job) and job.get("last_status") == "error"
+    return job or {}
 
 
 def main():
@@ -305,7 +337,8 @@ def main():
             raise SourceError("no token; approve the t3-code MCP server with runbooks/t3-mcp.md in dotfiles")
         return thread_items(token_file["access_token"])
 
-    sources = {"t3": t3_source, "issue": assigned_issues,
+    sources = {"t3": t3_source, "issue": lambda: requested_items("issue"),
+               "review": lambda: requested_items("review"),
                "pr": lambda: pr_items(run("gh", "api", "user", "--jq", ".login").strip())}
     failed_sources = set()
     for name, collect in sources.items():
@@ -325,7 +358,11 @@ def main():
     now = time.time()
     retry = set()
     retries = meta.get("agentRetries", 0)
-    if meta.get("lastWake") and last_agent_run_failed() and retries < AGENT_RETRIES:
+    job = last_job_result()
+    completed = job.get("last_run_at")
+    # A hard stop can leave the previous completion in the scheduler's record.
+    interrupted = "completionBeforeWake" in meta and completed == meta["completionBeforeWake"]
+    if meta.get("lastWake") and (job.get("last_status") == "error" or interrupted) and retries < AGENT_RETRIES:
         retry = set(meta["lastWake"])
         retries += 1
     else:
@@ -335,13 +372,15 @@ def main():
     for key, last in previous.items():
         # A failing source keeps its items' state until it answers again.
         if key.split(":", 1)[0] in failed_sources and key not in items:
+            if key in retry:
+                last["retryAfterRecovery"] = True
             state[key] = last
     for key, (fingerprint, detail) in items.items():
         last = previous.get(key)
         if last is None or last["fingerprint"] != fingerprint:
             detail["change"] = "new" if last is None else "changed"
-        elif key in retry:
-            detail["change"] = "retry: the previous agent run failed"
+        elif key in retry or last.get("retryAfterRecovery"):
+            detail["change"] = "retry: the previous wake has no successful completion"
         elif now - last["woke"] >= REMIND_HOURS * 3600:
             detail["change"] = f"unchanged for {REMIND_HOURS}+ hours"
         else:
@@ -352,7 +391,7 @@ def main():
 
     woken = [key for key, value in state.items() if value.get("woke") == now]
     state["_meta"] = {"sourceFailures": failures, "lastWake": woken,
-                      "agentRetries": retries if woken else 0}
+                      "agentRetries": retries if woken else 0, "completionBeforeWake": completed}
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
     with open(STATE + ".tmp", "w") as handle:
         json.dump(state, handle, indent=1)
