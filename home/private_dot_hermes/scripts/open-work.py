@@ -173,6 +173,10 @@ def gh_json(*args):
         raise SourceError(f"gh {' '.join(args[:2])}: invalid JSON: {error}")
 
 
+def github_login(user):
+    return ((user or {}).get("login") or "").casefold()
+
+
 def feedback(repo, number, login):
     """IDs and edit times of other people's comments, inline comments, and reviews."""
     entries = []
@@ -181,7 +185,7 @@ def feedback(repo, number, login):
                         (f"repos/{repo}/pulls/{number}/reviews", "submitted_at")):
         for page in gh_json("api", "--paginate", "--slurp", path):
             for entry in page:
-                if (entry.get("user") or {}).get("login") != login:
+                if github_login(entry.get("user")) != login.casefold():
                     entries.append([entry["id"], entry.get(stamp)])
     entries.sort()
     latest = max((e[1] for e in entries if e[1]), default=None)
@@ -196,9 +200,10 @@ def search_open(kind, role, fields):
 
 
 def request_policy():
-    path = os.path.expanduser("~/brain/policies/github-pickup.json")
+    workspace = os.path.expanduser("~/brain")
     try:
-        policy = json.load(open(path))
+        policy = json.loads(run("git", "-C", workspace, "show",
+                                "refs/remotes/origin/HEAD:policies/github-pickup.json"))
         if not isinstance(policy, dict) or not all(
                 isinstance(users, list) and all(isinstance(user, str) and user for user in users)
                 for users in policy.values()):
@@ -211,29 +216,38 @@ def request_policy():
 def direct_request(hit, kind, login, allowed):
     repo, number, url = hit["repository"]["nameWithOwner"], hit["number"], hit["url"]
     issue = kind == "issue"
-    event_type, target = ("assigned", "assignee") if issue else ("review_requested", "requested_reviewer")
+    review = kind == "review"
+    event_type, target = ("review_requested", "requested_reviewer") if review else ("assigned", "assignee")
     pages = gh_json("api", "--paginate", "--slurp", f"repos/{repo}/issues/{number}/timeline")
     events = [event for page in pages for event in page]
     request = next((e for e in reversed(events) if e.get("event") == event_type
-                    and (e.get(target) or {}).get("login", "").casefold() == login), None)
+                    and github_login(e.get(target)) == login), None)
     if not request:
         return None
-    actor = request.get("assigner" if issue else "review_requester") or request.get("actor") or {}
-    requester = actor.get("login", "").casefold()
+    actor = request.get("review_requester" if review else "assigner") or request.get("actor") or {}
+    requester = github_login(actor)
     if requester == login or requester not in allowed:
         return None
 
     fields = "state,title,assignees,body" if issue else "state,title,reviewRequests,headRefOid"
+    if kind == "assigned-pr":
+        fields = PR_FIELDS + ",state,assignees,author"
     item = gh_json("issue" if issue else "pr", "view", url, f"--json={fields}")
-    recipients = item["assignees" if issue else "reviewRequests"]
-    if item["state"] != "OPEN" or not any((r.get("login") or "").casefold() == login for r in recipients):
+    recipients = item["reviewRequests" if review else "assignees"]
+    if item["state"] != "OPEN" or not any(github_login(r) == login for r in recipients):
         return None
+    if kind == "assigned-pr":
+        if github_login(item.get("author")) == login:
+            return None  # The authored pull request is already tracked.
+        fingerprint, detail = pull_request_item(item, repo, login)
+        detail.update(kind="assigned-pr", requester=requester, requestId=request["id"])
+        return [request["id"], *fingerprint], detail
     detail = {"kind": "assigned-issue" if issue else "requested-review", "id": url,
               "title": item["title"], "requester": requester, "requestId": request["id"]}
     if issue:
         # Ignore labels, links, and the agent's own comments when deciding whether to wake it.
         comments = [[e["id"], e["updated_at"]] for e in events if e.get("event") == "commented"
-                    and (e.get("user") or {}).get("login", "").casefold() != login]
+                    and github_login(e.get("user")) != login]
         return [request["id"], digest([item["title"], item["body"], comments])], detail
     detail["head"] = item["headRefOid"]
     return [request["id"], item["headRefOid"]], detail
@@ -241,7 +255,7 @@ def direct_request(hit, kind, login, allowed):
 
 def requested_items(kind):
     issue = kind == "issue"
-    role = "--assignee=@me" if issue else "--review-requested=@me"
+    role = "--review-requested=@me" if kind == "review" else "--assignee=@me"
     login = gh_json("api", "user")["login"].casefold()
     policy = request_policy()
     items = {}
@@ -255,35 +269,41 @@ def requested_items(kind):
     return items
 
 
-def pr_items(login):
-    urls = set()
-    for role in ("author", "assignee"):
-        urls.update(hit["url"] for hit in search_open("prs", f"--{role}=@me", "url"))
+PR_FIELDS = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup"
+
+
+def pull_request_item(pr, repo, login):
+    url = pr["url"]
+    checks = sorted(
+        f"{c.get('name') or c.get('context')}={c.get('conclusion') or c.get('state') or c.get('status')}"
+        for c in pr["statusCheckRollup"] or []
+    )
+    feedback_digest, feedback_count, latest = feedback(repo, pr["number"], login)
+    failing = [c for c in checks if c.rsplit("=", 1)[1] in FAILED_CHECKS]
+    fingerprint = [pr["headRefOid"], digest(checks), pr["reviewDecision"], pr["isDraft"],
+                   pr["mergeable"], feedback_digest]
+    detail = {
+        "kind": "pull-request",
+        "id": url,
+        "title": pr["title"],
+        "draft": pr["isDraft"],
+        "reviewDecision": pr["reviewDecision"] or None,
+        "mergeable": pr["mergeable"],
+        "failingChecks": failing or None,
+        "feedbackFromOthers": feedback_count,
+        "latestFeedbackAt": latest,
+    }
+    return fingerprint, detail
+
+
+def authored_prs():
+    login = gh_json("api", "user")["login"]
     items = {}
-    fields = "url,title,number,headRefOid,isDraft,reviewDecision,mergeable,statusCheckRollup"
-    for url in sorted(urls):
-        pr = gh_json("pr", "view", url, f"--json={fields}")
-        repo = url.split("github.com/")[1].split("/pull/")[0]
-        checks = sorted(
-            f"{c.get('name') or c.get('context')}={c.get('conclusion') or c.get('state') or c.get('status')}"
-            for c in pr["statusCheckRollup"] or []
-        )
-        feedback_digest, feedback_count, latest = feedback(repo, pr["number"], login)
-        failing = [c for c in checks if c.rsplit("=", 1)[1] in FAILED_CHECKS]
-        fingerprint = [pr["headRefOid"], digest(checks), pr["reviewDecision"], pr["isDraft"],
-                       pr["mergeable"], feedback_digest]
-        detail = {
-            "kind": "pull-request",
-            "id": url,
-            "title": pr["title"],
-            "draft": pr["isDraft"],
-            "reviewDecision": pr["reviewDecision"] or None,
-            "mergeable": pr["mergeable"],
-            "failingChecks": failing or None,
-            "feedbackFromOthers": feedback_count,
-            "latestFeedbackAt": latest,
-        }
-        items["pr:" + url] = (fingerprint, detail)
+    for hit in search_open("prs", "--author=@me", "url,repository"):
+        url = hit["url"]
+        pr = gh_json("pr", "view", url, f"--json={PR_FIELDS},state,author")
+        if pr["state"] == "OPEN" and github_login(pr.get("author")) == login.casefold():
+            items["pr:" + url] = pull_request_item(pr, hit["repository"]["nameWithOwner"], login)
     return items
 
 
@@ -339,7 +359,7 @@ def main():
 
     sources = {"t3": t3_source, "issue": lambda: requested_items("issue"),
                "review": lambda: requested_items("review"),
-               "pr": lambda: pr_items(run("gh", "api", "user", "--jq", ".login").strip())}
+               "assigned-pr": lambda: requested_items("assigned-pr"), "pr": authored_prs}
     failed_sources = set()
     for name, collect in sources.items():
         try:
@@ -361,7 +381,7 @@ def main():
     job = last_job_result()
     completed = job.get("last_run_at")
     # A hard stop can leave the previous completion in the scheduler's record.
-    interrupted = "completionBeforeWake" in meta and completed == meta["completionBeforeWake"]
+    interrupted = "last_run_at" in job and "completionBeforeWake" in meta and completed == meta["completionBeforeWake"]
     if meta.get("lastWake") and (job.get("last_status") == "error" or interrupted) and retries < AGENT_RETRIES:
         retry = set(meta["lastWake"])
         retries += 1
@@ -391,7 +411,9 @@ def main():
 
     woken = [key for key, value in state.items() if value.get("woke") == now]
     state["_meta"] = {"sourceFailures": failures, "lastWake": woken,
-                      "agentRetries": retries if woken else 0, "completionBeforeWake": completed}
+                      "agentRetries": retries if woken else 0}
+    if "last_run_at" in job:
+        state["_meta"]["completionBeforeWake"] = completed
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
     with open(STATE + ".tmp", "w") as handle:
         json.dump(state, handle, indent=1)
